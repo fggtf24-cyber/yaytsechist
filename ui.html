@@ -1,0 +1,849 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Яйцечист</title>
+<style>
+/* цвета и шрифты как у Claude: тёплый графит, слоновая кость, терракота. Заголовки — засечки (Georgia есть в любой Windows) */
+@font-face{font-family:'Inter Tight';src:url('fonts/InterTight.ttf');font-weight:100 900}
+@font-face{font-family:'IBM Plex Mono';src:url('fonts/IBMPlexMono-Regular.ttf');font-weight:400}
+@font-face{font-family:'IBM Plex Mono';src:url('fonts/IBMPlexMono-Medium.ttf');font-weight:500 700}
+:root{color-scheme:dark;--bg:#262624;--deep:#1F1E1D;--card:#30302E;--line:#45443F;--ink:#FAF9F5;--muted:#B0AEA5;
+  --accent:#D97757;--accentHi:#E48B6C;--onAccent:#1F1E1D;--yolk:#F2C14E;
+  --serif:Georgia,'Times New Roman',serif;--sans:'Inter Tight','Segoe UI',sans-serif;--mono:'IBM Plex Mono',Consolas,monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+html{background:var(--bg);overflow:hidden}
+body{color:var(--ink);font-family:var(--sans);user-select:none;-webkit-user-select:none}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+button:disabled{opacity:.4;cursor:default}
+[hidden]{display:none!important}
+a{color:inherit;text-decoration:none}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* окно: слева панель с тремя яйцами, справа один раздел */
+main{display:grid;grid-template-columns:248px 1fr;height:100vh}
+.rail{display:flex;flex-direction:column;background:var(--deep);padding:30px 14px 22px}
+.logo{display:flex;align-items:center;gap:10px;padding:0 12px;font:400 21px var(--serif)}
+.logo svg{width:17px;height:22px}
+nav{display:grid;gap:4px;margin-top:44px}
+.cell{display:flex;align-items:center;gap:14px;width:100%;padding:11px 12px;border-radius:14px;text-align:left;transition:background .15s}
+.cell:hover{background:var(--bg)}
+.cell[aria-current=page]{background:var(--card)}
+.cell svg{flex:none;width:25px;height:32px;overflow:visible}
+.cell>div{min-width:0}
+.cell b{display:block;font:500 15px var(--sans)}
+.cell span{display:block;font:12px var(--mono);color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#yolkDot{fill:#6E6C64;transition:fill .4s,filter .4s}
+#yolkDot.on{fill:var(--yolk);filter:drop-shadow(0 0 5px rgba(242,193,78,.7))}
+#dirt{transition:opacity .5s}
+#ramFill{transition:y .6s}
+.railEnd{margin-top:auto;display:grid;gap:10px}
+#upd{padding:14px;border-radius:14px;background:var(--card);font-size:14px;line-height:1.35}
+#updText{display:block;font-weight:600}
+.updBtns{display:flex;align-items:center;gap:14px;margin-top:10px}
+.updBtns .act{height:34px;padding:0 16px;font-size:14px}
+.rail footer{margin-top:14px;padding:0 12px;font:12px var(--mono);color:var(--muted)}
+
+/* раздел: заголовок сверху, кнопка всегда на одном месте снизу */
+section{display:flex;flex-direction:column;width:100%;max-width:760px;height:100vh;margin:0 auto;padding:52px 64px 44px;min-width:0}
+section[hidden]{display:none}
+h2{font:400 34px/1.15 var(--serif);letter-spacing:-.3px}
+.sub{display:flex;align-items:center;gap:10px;min-height:28px;margin-top:8px;font-size:16px;line-height:1.45;color:var(--muted)}
+.ibtn{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;color:var(--muted)}
+.ibtn:not(:disabled):hover{color:var(--ink)}
+.body{flex:1;min-height:0;overflow-y:auto;scrollbar-width:thin;margin:26px -12px 0;padding:0 12px}
+
+/* строки */
+.row{display:grid;grid-template-columns:16px 1fr auto;align-items:center;gap:14px;min-height:42px;width:100%;font-size:16px;text-align:left}
+.row.info{grid-template-columns:1fr auto}
+.row.info>span:first-child{color:var(--muted)}
+button.row.off .name{color:var(--muted)}
+button.row:hover .name{color:var(--ink)}
+.sq{width:12px;height:15px;border:1.5px solid var(--muted);border-radius:50% 50% 50% 50%/60% 60% 40% 40%;transition:background .15s,border-color .15s}
+.sq.on{background:var(--yolk);border-color:var(--yolk)}
+.tags{display:flex;gap:12px;align-items:center;justify-content:flex-end}
+.tag{font:13px var(--mono);white-space:nowrap}
+.tag.yolk{color:var(--yolk)}
+.tag.muted{color:var(--muted)}
+.note{opacity:0;transition:opacity .15s}
+.row:hover .note,.row:focus-visible .note{opacity:1}
+.mini{border-radius:50%;width:24px;height:24px;font:15px/1 var(--mono);color:var(--muted)}
+.mini:hover{color:var(--ink);background:var(--card)}
+.val{display:block;font:13px var(--mono);max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* кнопки */
+.actions{display:flex;align-items:center;gap:18px;margin-top:22px;flex:none}
+.act{height:52px;padding:0 28px;white-space:nowrap;border-radius:99px;background:var(--card);font:600 16px var(--sans);transition:background .15s}
+.act.accent{background:var(--accent);color:var(--onAccent)}
+.act.wide{flex:1}
+.act:not(:disabled):hover{background:var(--line)}
+.act.accent:not(:disabled):hover{background:var(--accentHi)}
+.result{font:13px var(--mono);color:var(--muted)}
+
+/* что занимает место: тут нужна вся ширина окна */
+section.wide{max-width:none;padding:30px 36px 24px}
+.wide h2{font-size:30px}
+.head{display:flex;align-items:center;gap:18px;min-height:38px}
+.tools{margin-left:auto;display:flex;gap:18px}
+.link{font-size:14px;color:var(--muted)}
+.link:not(:disabled):hover{color:var(--ink)}
+#mStart,#mScan{flex:1;min-height:0;margin-top:22px}
+#mScan{display:flex;flex-direction:column;justify-content:center;max-width:620px;margin-inline:auto;width:100%}
+#mStart[hidden],#mScan[hidden],#mResult[hidden]{display:none}
+.drive{display:grid;grid-template-columns:60px 1fr 270px;align-items:center;gap:18px;width:100%;min-height:54px;max-width:760px;text-align:left;font-size:16px}
+.drive:hover b{color:var(--accentHi)}
+.drive b{font:500 16px var(--mono)}
+.drive span{font:13px var(--mono);color:var(--muted);text-align:right}
+.bar{display:block;height:4px;border-radius:2px;background:var(--card);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent);border-radius:2px}
+#mStart .link{margin-top:14px}
+.big{font:400 40px var(--serif)}
+.path{font:12px var(--mono);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#mScan .bar{margin:18px 0 10px}
+#mScan .act{align-self:flex-start;margin-top:24px}
+#mResult{flex:1;min-height:0;display:flex;flex-direction:column;margin-top:6px}
+.bartop{display:flex;align-items:center;gap:16px;margin-top:12px;min-height:30px;flex:none}
+.seg{display:flex;gap:2px;flex:none}
+.seg button{padding:5px 13px;border-radius:99px;font-size:14px;color:var(--muted)}
+.seg button:hover{color:var(--ink)}
+.seg button[aria-pressed=true]{background:var(--card);color:var(--ink)}
+.crumbs{display:flex;align-items:center;gap:4px;min-width:0;overflow:hidden;font:13px var(--mono);color:var(--muted);white-space:nowrap}
+.crumbs button{color:var(--muted);flex:none;max-width:190px;overflow:hidden;text-overflow:ellipsis}
+.crumbs button:hover,.crumbs button:last-child{color:var(--ink)}
+#mQuery{flex:1;max-width:340px;height:30px;padding:0 14px;border:0;border-radius:99px;background:var(--card);color:var(--ink);font:14px var(--sans);user-select:text;-webkit-user-select:text}
+#mQuery::placeholder{color:var(--muted)}
+#mMapBox{position:relative;flex:1 1 44%;min-height:150px;margin-top:10px}
+#mMap{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:pointer}
+.legend{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:9px;flex:none;font-size:13px;color:var(--muted)}
+.legend i{display:inline-block;width:9px;height:11px;margin-right:6px;border-radius:50% 50% 50% 50%/60% 60% 40% 40%;vertical-align:-1px}
+#mList{flex:1 1 40%;min-height:0;overflow-y:auto;scrollbar-width:thin;margin-top:8px}
+.mrow{display:grid;grid-template-columns:minmax(0,1fr) 110px 82px 72px 86px;align-items:center;gap:14px;width:100%;min-height:32px;padding:0 10px;border-radius:9px;text-align:left;font-size:14px}
+.mrow:hover{background:var(--card)}
+.mrow[aria-selected=true]{background:var(--line)}
+.mrow .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mrow.dir .nm{font-weight:600}
+.mrow .num{font:12px var(--mono);text-align:right;color:var(--muted);white-space:nowrap}
+.mrow .num.sz{color:var(--ink)}
+.mhead{min-height:24px;font-size:12px;color:var(--muted);padding:0 10px}
+.mhead:hover{background:none}
+.mhead .num{font:12px var(--sans)}
+#mAct{display:flex;align-items:center;gap:18px;margin-top:10px;min-height:32px;flex:none}
+#mAct .path{flex:1;min-width:0}
+#mTip{position:fixed;z-index:5;max-width:380px;padding:8px 12px;border-radius:10px;background:var(--deep);box-shadow:0 4px 18px rgba(0,0,0,.45);pointer-events:none;font-size:13px;line-height:1.4}
+#mTip[hidden]{display:none}
+#mTip b{display:block;font-weight:600;overflow-wrap:anywhere}
+#mTip span{font:12px var(--mono);color:var(--muted)}
+
+/* кнопка-яйцо: яйцо стоит в подставке, при очистке с него слезает скорлупа */
+.peel{display:inline-flex;align-items:center;gap:14px;height:56px;padding:0 30px 0 20px}
+.peel[data-egg]:not([data-egg=idle]){opacity:1}
+.eggbox{position:relative;width:40px;height:60px;margin-top:-20px;flex:none}
+.eggbox::after{content:"";position:absolute;left:5px;right:5px;bottom:2px;height:13px;border-radius:3px 3px 15px 15px;background:var(--deep)}
+.egg{position:absolute;left:3px;bottom:7px;width:34px;height:43px;overflow:visible;transform-origin:50% 92%;transition:transform .2s}
+.peel:not(:disabled):hover .egg{transform:rotate(-7deg)}
+.shard{transform-box:view-box;opacity:0}
+.shard .seam{fill:none;stroke:#6B3A22;stroke-width:1;stroke-dasharray:1;stroke-dashoffset:1;transition:stroke-dashoffset .5s ease-out}
+.whole{transition:opacity .1s}
+.spark{fill:var(--yolk);opacity:0;transform-box:fill-box;transform-origin:center}
+[data-egg=crack] .whole,[data-egg=peel] .whole,[data-egg=clean] .whole{opacity:0}
+[data-egg=crack] .shard,[data-egg=peel] .shard,[data-egg=clean] .shard{opacity:1}
+[data-egg=crack] .seam,[data-egg=peel] .seam,[data-egg=clean] .seam{stroke-dashoffset:0}
+[data-egg=crack] .egg{animation:knock .5s ease-in-out}
+[data-egg=peel] .egg{animation:wobble 1s ease-in-out infinite}
+[data-egg=clean] .egg{animation:hop .55s cubic-bezier(.3,1.5,.5,1)}
+[data-egg=clean] .spark{animation:spark 1s ease-out .15s both}
+[data-egg=clean] .spark+.spark{animation-delay:.32s}
+.shard.off{animation:fall .8s cubic-bezier(.45,0,.9,.55) forwards}
+@keyframes knock{0%,100%{transform:none}25%{transform:rotate(-9deg)}55%{transform:rotate(7deg)}80%{transform:rotate(-3deg)}}
+@keyframes wobble{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(3deg)}}
+@keyframes hop{0%{transform:scale(1)}45%{transform:translateY(-7px) scale(1.05)}100%{transform:none}}
+@keyframes spark{0%{opacity:0;transform:scale(.2) rotate(0)}40%{opacity:1;transform:scale(1) rotate(30deg)}100%{opacity:0;transform:scale(.5) rotate(70deg)}}
+@keyframes fall{
+  0%{opacity:1;transform:none}
+  22%{opacity:1;transform:translate(calc(var(--dx)*.3),-4px) rotate(calc(var(--r)*.25))}
+  100%{opacity:0;transform:translate(var(--dx),58px) rotate(var(--r))}}
+@media (prefers-reduced-motion:reduce){
+  .egg,.spark{animation:none!important}
+  .shard.off{animation:none;opacity:0}
+}
+
+/* память */
+.meter{height:4px;background:var(--card);border-radius:2px;margin-top:22px;overflow:hidden;flex:none}
+.meter i{display:block;height:100%;width:0;background:var(--yolk);transition:width .6s}
+details{margin-top:6px}
+summary{list-style:none;cursor:pointer;min-height:42px;display:flex;align-items:center;font-size:15px;color:var(--muted)}
+summary::-webkit-details-marker{display:none}
+summary:hover{color:var(--ink)}
+#status.busy::after{content:"_";animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+
+/* окно включения */
+#modal{position:fixed;inset:0;background:rgba(20,19,18,.75);display:grid;place-items:center}
+#modal[hidden]{display:none}
+.sheet{width:min(500px,90vw);background:var(--bg);border-radius:24px;padding:32px 36px}
+.sheet h2{font-size:30px}
+.sheet p{font-size:15px;line-height:1.45;color:var(--muted);margin:10px 0 16px}
+.sheet ol{list-style:none;margin-bottom:24px}
+.sheet li{display:grid;grid-template-columns:1fr auto;align-items:center;gap:10px;min-height:36px;font-size:15px}
+.sheet li .n{display:none}
+.sheet .actions{margin-top:0}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <radialGradient id="gShell" cx=".38" cy=".3" r=".85"><stop offset="0" stop-color="#FBEBD9"/><stop offset=".55" stop-color="#F0D2B4"/><stop offset="1" stop-color="#CF9C74"/></radialGradient>
+  <radialGradient id="gBoiled" cx=".38" cy=".3" r=".85"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".65" stop-color="#FAF9F5"/><stop offset="1" stop-color="#D9D4C6"/></radialGradient>
+  <path id="eggPath" d="M30 2C45 2 56 28 56 46C56 62 44 74 30 74C16 74 4 62 4 46C4 28 15 2 30 2Z"/>
+  <clipPath id="cEgg"><use href="#eggPath"/></clipPath>
+  <g id="specks" fill="#8F4F2F" opacity=".5"><circle cx="22" cy="18" r="1"/><circle cx="38" cy="26" r="1.3"/><circle cx="16" cy="38" r="1.2"/><circle cx="31" cy="42" r=".9"/><circle cx="45" cy="46" r="1.1"/><circle cx="24" cy="58" r="1.3"/><circle cx="40" cy="62" r=".9"/></g>
+</defs></svg>
+
+<main>
+<aside class="rail">
+  <span class="logo"><svg viewBox="0 0 60 76" aria-hidden="true"><use href="#eggPath" fill="#D97757"/></svg>Яйцечист</span>
+  <nav aria-label="Разделы">
+    <button class="cell" data-view="s1" aria-current="page"><svg viewBox="0 0 60 76" aria-hidden="true"><use href="#eggPath" fill="url(#gBoiled)"/><circle id="yolkDot" cx="30" cy="46" r="15"/></svg>
+      <div><b>Оптимизация</b><span id="tYolk">—</span></div></button>
+    <button class="cell" data-view="s2"><svg viewBox="0 0 60 76" aria-hidden="true"><use href="#eggPath" fill="url(#gShell)"/><use id="dirt" href="#specks" style="opacity:0"/></svg>
+      <div><b>Диск</b><span id="tShell">—</span></div></button>
+    <button class="cell" data-view="s5"><svg viewBox="0 0 60 76" aria-hidden="true"><g clip-path="url(#cEgg)"><rect width="60" height="76" fill="#D4724F"/><rect x="33" width="27" height="40" fill="#B98A00"/><rect x="33" y="42" width="27" height="34" fill="#2FA58F"/><rect x="31" width="2" height="76" fill="#1F1E1D"/><rect x="31" y="40" width="29" height="2" fill="#1F1E1D"/></g></svg>
+      <div><b>Место на диске</b><span id="tPlace">не проверено</span></div></button>
+    <button class="cell" data-view="s3"><svg viewBox="0 0 60 76" aria-hidden="true"><use href="#eggPath" fill="#45443F"/><g clip-path="url(#cEgg)"><rect id="ramFill" x="0" y="76" width="60" height="76" fill="#FAF9F5"/></g></svg>
+      <div><b>Память</b><span id="tRam">—</span></div></button>
+  </nav>
+  <div class="railEnd">
+    <div id="upd" hidden><span id="updText" aria-live="polite"></span>
+      <div class="updBtns"><button class="act accent" id="updGo" onclick="updInstall()">Обновить</button><button class="link" onclick="$('upd').hidden = true">Позже</button></div></div>
+    <button class="cell" data-view="s4"><svg viewBox="0 0 60 76" aria-hidden="true"><use href="#eggPath" fill="none" stroke="#B0AEA5" stroke-width="5"/></svg>
+      <div><b>Настройки</b><span id="tTray">—</span></div></button>
+  </div>
+  <footer><span id="status">Загрузка</span></footer>
+</aside>
+
+<div>
+<section id="s1">
+  <h2>Оптимизация для игр</h2>
+  <p class="sub" id="alHint"></p>
+  <div class="body">
+    <div class="row info"><span>Таймер Windows</span><span class="tags" id="vTimer"></span></div>
+    <div class="row info"><span>План питания</span><span class="val" id="vPlan">—</span></div>
+    <div class="row info"><span>Работа в фоне</span><span class="tags" id="vAgent"></span></div>
+  </div>
+  <div class="actions"><button class="act accent" id="alBtn" onclick="antilag()">Включить оптимизацию</button></div>
+</section>
+
+<section id="s2" hidden>
+  <h2>Очистка диска</h2>
+  <div class="sub"><span id="diskTotal">Считаю…</span>
+    <button class="ibtn" onclick="scan()" title="Пересчитать" aria-label="Пересчитать">
+      <svg viewBox="0 0 16 16" width="13" height="13"><path d="M13 6A5.5 5.5 0 1 0 13.5 9M13 1.5V6H8.5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button></div>
+  <div class="body" id="cats"></div>
+  <div class="actions"><button class="act peel" id="diskBtn" onclick="cleanDisk()" title="Файлы, занятые программами, пропускаются"><span class="label">Очистить</span></button><span class="result" id="diskResult" aria-live="polite"></span></div>
+</section>
+
+<section id="s3" hidden>
+  <h2>Очистка памяти</h2>
+  <p class="sub" id="ramText">—</p>
+  <div class="meter" title="Загрузка оперативной памяти"><i id="ramBar"></i></div>
+  <div class="body">
+    <div id="auto"></div>
+    <details>
+      <summary id="areasSummary">Что именно чистить</summary>
+      <div id="areas"></div>
+    </details>
+  </div>
+  <div class="actions"><button class="act peel accent" id="ramBtn" onclick="cleanRam()"><span class="label">Очистить память</span></button><span class="result" id="ramResult" aria-live="polite"></span></div>
+</section>
+
+<section id="s5" class="wide" hidden>
+  <div class="head"><h2>Что занимает место</h2>
+    <div class="tools" id="mTools" hidden>
+      <button class="link" onclick="mHome()">Другой диск</button>
+      <button class="link" onclick="mRescan()">Обновить скан</button>
+      <button class="link" onclick="mExport()">В таблицу CSV</button>
+    </div></div>
+  <div id="mStart">
+    <div id="mDrives"></div>
+    <button class="link" onclick="mPick()">Выбрать папку…</button>
+  </div>
+  <div id="mScan" hidden>
+    <div class="big" id="mCount">0 файлов</div>
+    <span class="bar"><i id="mFill" style="width:0"></i></span>
+    <div class="path" id="mNow"></div>
+    <button class="act" onclick="api().tree_cancel()">Остановить</button>
+  </div>
+  <div id="mResult" hidden>
+    <p class="sub" id="mSum"></p>
+    <div class="bartop">
+      <div class="seg" id="mTabs">
+        <button data-tab="dirs" aria-pressed="true">Папки</button><button data-tab="files" aria-pressed="false">Файлы</button><button data-tab="types" aria-pressed="false">Типы</button>
+      </div>
+      <div class="crumbs" id="mCrumbs"></div>
+      <input id="mQuery" type="search" placeholder="Найти файл или папку" aria-label="Поиск по имени" hidden>
+    </div>
+    <div id="mMapBox"><canvas id="mMap" role="img" aria-label="Схема: размер прямоугольника — сколько места занимает файл или папка"></canvas></div>
+    <div class="legend" id="mLegend"></div>
+    <div id="mList"></div>
+    <div id="mAct"><span class="path" id="mSel">Выбери файл или папку</span>
+      <button class="link" id="mShow" onclick="api().tree_reveal(mSelected)" disabled>Показать в проводнике</button>
+      <button class="link" id="mDel" onclick="mDelete()" disabled>В корзину</button></div>
+  </div>
+</section>
+
+<section id="s4" hidden>
+  <h2>Настройки</h2>
+  <p class="sub">В фоне работают значок в трее и автоочистка памяти, даже когда окно закрыто.</p>
+  <div class="body">
+    <div id="tray"></div>
+    <div class="row info"><span>Язык</span><div class="seg" id="langSeg"><button data-lang="ru">Русский</button><button data-lang="en">English</button></div></div>
+    <div class="row info"><span>Версия</span><span class="tags"><span class="tag" id="vVer"></span><button class="link" onclick="updCheck(true)">Проверить обновления</button></span></div>
+  </div>
+</section>
+</div>
+</main>
+
+<div id="mTip" hidden></div>
+
+<div id="modal" hidden><div class="sheet">
+  <h2 id="mTitle"></h2><p id="mText"></p><ol id="steps"></ol><div class="actions" id="mBtns"></div>
+</div></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const api = () => window.pywebview.api;
+const EN = { "Яйцечист": "Yaytsechist", "Разделы": "Sections", "Оптимизация": "Optimization", "Диск": "Disk", "Место на диске": "Disk usage", "Память": "Memory", "Настройки": "Settings", "Загрузка": "Loading", "не проверено": "not scanned", "проверяю…": "scanning…", "Оптимизация для игр": "Game optimization", "Таймер Windows": "Windows timer", "План питания": "Power plan", "Работа в фоне": "Background mode", "Включить оптимизацию": "Turn on optimization", "Выключить и вернуть как было": "Turn off and restore settings", "Работает. Окно можно закрыть — программа останется в трее.": "Running. You can close the window, the app stays in the tray.", "План питания, таймер 0.5 мс, без Game DVR. Всё возвращается одной кнопкой.": "Power plan, 0.5 ms timer, no Game DVR. One button restores everything.", "включена": "on", "выключена": "off", "выключено": "off", "работает": "running", " мс": " ms", "обычно 15.6": "usually 15.6", "Очистка диска": "Disk cleanup", "Считаю…": "Counting…", "Пересчитать": "Recount", "Очистить": "Clean", "Очистить ": "Clean ", "Файлы, занятые программами, пропускаются": "Files in use are skipped", "Можно освободить ": "You can free ", "Временные файлы": "Temporary files", "старше суток": "older than a day", "Temp Windows": "Windows Temp", "Windows Update": "Windows Update", "кэш загрузок": "download cache", "Отчёты об ошибках": "Error reports", "и дампы": "and dumps", "Браузеры": "Browsers", "закройте их": "close them first", "Steam / Epic / Discord": "Steam / Epic / Discord", "веб-кэш": "web cache", "Кэш шейдеров": "Shader cache", "только если игры глючат": "only if games glitch", "Корзина": "Recycle Bin", "Кэш After Effects": "After Effects cache", "закройте Adobe": "close Adobe apps first", "навсегда": "permanent", "Очистка памяти": "Memory cleanup", "Очистить память": "Clean memory", "Загрузка оперативной памяти": "Memory load", "Что именно чистить": "What to clean", "Что чистить: {0} из {1}": "What to clean: {0} of {1}", "Занято {0} из {1}": "Used {0} of {1}", "Чистить, когда память занята больше чем": "Clean when memory use is above", "Чистить по расписанию, каждые": "Clean on a schedule, every", " мин": " min", "Порог": "Threshold", "Интервал": "Interval", " меньше": " down", " больше": " up", "Память запущенных программ": "Memory of running apps", "рабочие наборы": "working sets", "Файловый кэш системы": "System file cache", "безопасно": "safe", "Записать кэш файлов на диск": "Write file cache to disk", "Изменённые страницы": "Modified pages", "может подвисать": "may stutter", "Резервная память (standby)": "Standby memory", "Резервная память, низкий приоритет": "Standby memory, low priority", "Кэш реестра": "Registry cache", "Windows 8.1+": "Windows 8.1+", "Объединение одинаковых страниц": "Combine identical pages", "Windows 10+": "Windows 10+", "Что занимает место": "What takes up space", "Другой диск": "Another drive", "Обновить": "Update", "Обновить скан": "Rescan", "В таблицу CSV": "Export to CSV", "Выбрать папку…": "Choose a folder…", "0 файлов": "0 files", "Остановить": "Stop", "Папки": "Folders", "Файлы": "Files", "Типы": "Types", "Найти файл или папку": "Find a file or folder", "Поиск по имени": "Search by name", "Схема: размер прямоугольника — сколько места занимает файл или папка": "Map: the size of a rectangle shows how much space a file or folder takes", "Выбери файл или папку": "Select a file or folder", "Показать в проводнике": "Show in Explorer", "В корзину": "Move to Recycle Bin", "свободно {0} из {1}": "{0} free of {1}", "{0} в {1}": "{0} in {1}", "свободно {0}": "{0} free", "ещё {0} закрыто от сканера": "{0} more is closed to the scanner", "Недоступных файлов и папок: ": "Inaccessible files and folders: ", "и ещё {0} поменьше": "and {0} smaller items", "Имя": "Name", "Доля": "Share", "Размер": "Size", "Файлов": "Files", "Изменён": "Modified", "Самые большие файлы": "Largest files", "Тип": "Type", "Расширение": "Extension", "без расширения": "no extension", "Показать такие файлы": "Show these files", "Мелкие файлы: ": "Small files: ", "Видео": "Video", "Музыка": "Music", "Картинки": "Images", "Архивы и образы": "Archives and disk images", "Программы": "Programs", "Документы": "Documents", "Другое": "Other", "В корзину?": "Move to Recycle Bin?", "Удалить": "Delete", "Отмена": "Cancel", "Закрыть": "Close", "В корзину отправлено ": "Moved to Recycle Bin: ", "Сохранено: ": "Saved: ", "Это системная папка, её удалять нельзя": "This is a system folder and cannot be deleted", "Не получилось: файл занят или удаление отменено": "Failed: the file is in use or deletion was cancelled", "В фоне работают значок в трее и автоочистка памяти, даже когда окно закрыто.": "The tray icon and automatic memory cleanup keep working when the window is closed.", "Держать в трее и запускать вместе с Windows": "Keep in tray and start with Windows", "работает в фоне": "running in background", "фон выключен": "background off", "Язык": "Language", "Русский": "Русский", "Версия": "Version", "Проверить обновления": "Check for updates", "Позже": "Later", "Вышла версия {0}": "Version {0} is out", "Скачиваю обновление…": "Downloading update…", "Не вышло обновиться. Попробуй позже.": "Update failed. Try again later.", "Установлена последняя версия": "You have the latest version", "Не удалось проверить обновления": "Could not check for updates", "Оптимизация включена": "Optimization is on", "Готово": "Ready", "Ошибка: ": "Error: ", "Считаю мусор на диске": "Counting junk on disk", "Очищаю диск": "Cleaning disk", "Очищаю память": "Cleaning memory", "освобождено ": "freed ", "ждёт": "waiting", "Включение": "Turning on", "Выключение": "Turning off", "Настраиваю систему и чищу компьютер. Это займёт до минуты.": "Setting up the system and cleaning the PC. This takes up to a minute.", "Возвращаю все настройки, как было до включения.": "Restoring all settings to how they were.", "План питания как в AntiLag": "AntiLag power plan", "Таймеры, видеокарта, Game DVR": "Timers, GPU, Game DVR", "Работа в фоне и значок в трее": "Background mode and tray icon", "Кэш NVIDIA": "NVIDIA cache", "Прежний план питания": "Previous power plan", "Фоновый режим": "Background mode", "Включаю оптимизацию": "Turning on optimization", "Возвращаю настройки": "Restoring settings", "готово": "done", "ошибка": "error", "идёт…": "running…", "Перезагрузить?": "Restart now?", "Часть настроек (таймеры и реестр) заработает только после перезагрузки.": "Some settings (timers and registry) only apply after a restart.", "Перезагрузить": "Restart", "Перезагрузка через 5 секунд…": "Restarting in 5 seconds…", "Б": "B", "КБ": "KB", "МБ": "MB", "ГБ": "GB", "ТБ": "TB" };
+let lang = 'ru';
+// русский текст — он же ключ перевода; {0} {1} — подстановки
+function t(ru, ...args) {
+  if (lang == 'en' && !(ru in EN)) console.warn('нет перевода', ru);
+  return (lang == 'en' && EN[ru] || ru).replace(/\{(\d)\}/g, (_, i) => args[i]);
+}
+// русский текст из вёрстки запоминается один раз, до того как его заменит код
+const STATIC = [];
+for (const walker = document.createTreeWalker(document.querySelector('main'), NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT); walker.nextNode();) {
+  const n = walker.currentNode;
+  if (n.nodeType == 3 && /[А-Яа-яЁё]/.test(n.nodeValue)) STATIC.push([n, null, n.nodeValue.trim()]);
+  if (n.nodeType == 1) for (const a of ['title', 'aria-label', 'placeholder']) if (/[А-Яа-яЁё]/.test(n.getAttribute(a) || '')) STATIC.push([n, a, n.getAttribute(a)]);
+}
+function translatePage() {
+  document.documentElement.lang = lang;
+  for (const [n, attr, ru] of STATIC) attr ? n.setAttribute(attr, t(ru)) : n.nodeValue = t(ru);
+  document.querySelectorAll('#langSeg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.lang == lang));
+}
+function setLang(l) {
+  lang = l; S.lang = l;
+  api().put('lang', l);
+  $('diskResult').textContent = $('ramResult').textContent = '';
+  translatePage(); render(); poll();
+  if (mInfo) { $('tPlace').textContent = ''; mSummary(); if (!$('mResult').hidden) mRefresh(); else if (!$('mStart').hidden) mHome(); }
+  else if (!$('mStart').hidden) mHome();
+  if (S.update) $('updText').textContent = t('Вышла версия {0}', S.update);
+}
+document.querySelectorAll('#langSeg button').forEach(b => b.onclick = () => setLang(b.dataset.lang));
+
+// обновление: программа сама спрашивает GitHub при запуске, а ставит только по кнопке
+async function updCheck(manual) {
+  const u = await api().update_check();
+  if (u && u.version) {
+    S.update = u.version;
+    $('updText').textContent = t('Вышла версия {0}', u.version);
+    $('upd').hidden = false;
+  } else if (manual) status(t(u ? 'Установлена последняя версия' : 'Не удалось проверить обновления'));
+}
+async function updInstall() {
+  $('updGo').disabled = true;
+  $('updText').textContent = t('Скачиваю обновление…');
+  const r = await api().update_install();  // при успехе программа перезапускается и сюда не возвращается
+  if (!r.ok) { $('updText').textContent = t('Не вышло обновиться. Попробуй позже.'); $('updGo').disabled = false; }
+}
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+let S = null, sizes = [], busy = false;
+
+function fmt(n) {
+  if (n == null) return '—';
+  const u = [t('Б'), t('КБ'), t('МБ'), t('ГБ'), t('ТБ')]; let i = 0;
+  while (n >= 1024 && i < 4) { n /= 1024; i++; }
+  return (i < 2 ? Math.round(n) : n.toFixed(1)) + ' ' + u[i];
+}
+function status(t, isBusy = false) { $('status').textContent = t; $('status').className = isBusy ? 'busy' : ''; }
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+function tag(text, cls) { return el('span', 'tag' + (cls ? ' ' + cls : ''), text); }
+
+// скорлупа: куски стыкуются рваными краями; [точки, центр x, центр y, куда отлетает, поворот]
+const SHARDS = [
+  ['0,0 30,0 30,19 20,27 12,20 0,26', 17, 14, -20, -80],
+  ['30,0 60,0 60,25 48,19 40,26 30,19', 43, 14, 22, 95],
+  ['0,26 12,20 20,27 24,38 19,52 10,44 0,50', 12, 36, -30, -120],
+  ['20,27 30,19 40,26 36,40 41,52 30,45 19,52 24,38', 30, 36, 5, 140],
+  ['40,26 48,19 60,25 60,51 50,45 41,52 36,40', 48, 36, 32, 110],
+  ['0,50 10,44 19,52 30,45 27,60 32,76 0,76', 15, 60, -18, -60],
+  ['30,45 41,52 50,45 60,51 60,76 32,76 27,60', 45, 60, 18, 70],
+];
+const FALL_ORDER = [0, 1, 3, 2, 4, 5, 6], KEEP = 2;  // KEEP кусков держатся, пока очистка не закончится
+const STAR = 'M0-6Q.8-.8 6 0Q.8.8 0 6Q-.8.8-6 0Q-.8-.8 0-6Z';
+
+function eggSvg(id) {
+  const shards = SHARDS.map(([pts, cx, cy, dx, r], i) => `
+    <clipPath id="${id}${i}"><polygon points="${pts}"/></clipPath>
+    <g class="shard" style="transform-origin:${cx}px ${cy}px;--dx:${dx}px;--r:${r}deg"><g clip-path="url(#cEgg)"><g clip-path="url(#${id}${i})">
+      <use href="#eggPath" fill="url(#gShell)"/><use href="#specks"/>
+      <polygon class="seam" pathLength="1" points="${pts}"/></g></g></g>`).join('');
+  return `<svg class="egg" viewBox="0 0 60 76" aria-hidden="true"><use href="#eggPath" fill="url(#gBoiled)"/>${shards}
+    <g class="whole"><use href="#eggPath" fill="url(#gShell)"/><use href="#specks"/></g>
+    <g transform="translate(58 12)"><path class="spark" d="${STAR}"/></g><g transform="translate(2 34) scale(.7)"><path class="spark" d="${STAR}"/></g></svg>`;
+}
+for (const id of ['diskBtn', 'ramBtn']) {
+  const box = el('span', 'eggbox'); box.innerHTML = eggSvg(id); $(id).prepend(box); $(id).dataset.egg = 'idle';
+}
+
+// очистка яйца: стук → трещины → скорлупа слезает, пока идёт работа → чистое яйцо
+const peelers = {};
+function peel(btn) {
+  clearTimeout(peelers[btn.id]);
+  const shards = [...btn.querySelectorAll('.shard')], left = FALL_ORDER.map(i => shards[i]);
+  shards.forEach(s => s.classList.remove('off'));
+  btn.dataset.egg = 'crack';
+  const drop = (keep, gap, then) => {
+    if (left.length <= keep) return then && then();
+    left.shift().classList.add('off');
+    peelers[btn.id] = setTimeout(() => drop(keep, gap, then), gap);
+  };
+  peelers[btn.id] = setTimeout(() => { btn.dataset.egg = 'peel'; drop(KEEP, 230); }, 560);
+  return ok => {
+    clearTimeout(peelers[btn.id]);
+    const idle = () => { btn.dataset.egg = 'idle'; shards.forEach(s => s.classList.remove('off')); };
+    if (!ok) return idle();
+    drop(0, 110, () => {
+      btn.dataset.egg = 'clean';
+      peelers[btn.id] = setTimeout(idle, 2400);
+    });
+  };
+}
+async function peelTask(btn, text, fn) {
+  if (busy) return;
+  const done = peel(btn);
+  let ok = false;
+  await task(text, async () => { await Promise.all([fn(), sleep(2100)]); ok = true; });  // яйцо успевает облезть, даже если очистка мгновенная
+  done(ok);
+}
+
+document.querySelectorAll('.cell').forEach(c => c.onclick = () => {
+  document.querySelectorAll('.cell').forEach(x => x === c ? x.setAttribute('aria-current', 'page') : x.removeAttribute('aria-current'));
+  document.querySelectorAll('section').forEach(v => v.hidden = v.id !== c.dataset.view);
+  if (c.dataset.view == 's5' && !mInfo && $('mScan').hidden) mHome();
+});
+
+// ---------- что занимает место ----------
+// цвета типов проверены на различимость, в том числе при дальтонизме; порядок как KINDS в gameboost.py
+const KIND_COLORS = ['#D4724F', '#2FA58F', '#B98A00', '#8E6BD8', '#D9578F', '#3C8FD9', '#6E6C64'];
+const SEP = '\\';
+let mInfo = null, mCur = null, mTab = 'dirs', mSelected = null, mTree = [], mLeaves = [], mHover = null, mPaper = null, mTimer = 0;
+const plural = (n, a, b, c) => { const t = n % 100, u = n % 10; return t > 10 && t < 20 ? c : u == 1 ? a : u > 1 && u < 5 ? b : c; };
+const files = n => n.toLocaleString(lang) + ' ' + (lang == 'en' ? (n == 1 ? 'file' : 'files') : plural(n, 'файл', 'файла', 'файлов'));
+const day = t => t ? new Date(t * 1000).toLocaleDateString(lang) : '—';
+const pct = (a, b) => b ? (a / b * 100).toFixed(a / b < .1 ? 1 : 0) + '%' : '0%';
+const joinPath = (a, b) => a.endsWith(SEP) ? a + b : a + SEP + b;
+
+function mShowPane(id) { for (const p of ['mStart', 'mScan', 'mResult']) $(p).hidden = p != id; $('mTools').hidden = id != 'mResult'; }
+async function mHome() {
+  mShowPane('mStart');
+  const ds = await api().drives();
+  $('mDrives').replaceChildren(...ds.map(d => {
+    const r = el('button', 'drive'), bar = el('span', 'bar'), fill = el('i');
+    fill.style.width = pct(d.total - d.free, d.total).replace('%', '') + '%'; bar.append(fill);
+    r.append(el('b', '', d.path), bar, el('span', '', t('свободно {0} из {1}', fmt(d.free), fmt(d.total))));
+    r.onclick = () => mStart(d.path, d.total - d.free);
+    return r;
+  }));
+}
+async function mPick() { const p = await api().tree_pick(); if (p) mStart(p, 0); }
+function mRescan() { mStart(mInfo.path, mInfo.total - mInfo.free); }
+
+async function mStart(path, expected) {
+  await api().tree_start(path);
+  mShowPane('mScan'); mSelect(null);
+  $('tPlace').textContent = t('проверяю…');
+  $('mFill').parentElement.hidden = !expected;
+  clearInterval(mTimer);
+  mTimer = setInterval(async () => {
+    const p = await api().tree_progress();
+    $('mCount').textContent = files(p.files);
+    $('mNow').textContent = p.current;
+    $('mFill').style.width = Math.min(100, p.bytes / (expected || 1) * 100) + '%';
+    if (p.running) return;
+    clearInterval(mTimer);
+    if (!p.ready) { $('tPlace').textContent = t('не проверено'); return mHome(); }
+    mInfo = await api().tree_info();
+    mShowPane('mResult');
+    mOpen(mInfo.path);
+  }, 300);
+}
+
+function mSummary() {
+  const bits = [t('{0} в {1}', fmt(mInfo.size), files(mInfo.count)), t('свободно {0}', fmt(mInfo.free))];
+  if (mInfo.hidden > 2 ** 20) bits.push(t('ещё {0} закрыто от сканера', fmt(mInfo.hidden)));
+  $('mSum').textContent = bits.join(' · ');
+  $('mSum').title = mInfo.denied ? t('Недоступных файлов и папок: ') + mInfo.denied : '';
+  $('tPlace').textContent = `${mInfo.path.slice(0, 3)} ${fmt(mInfo.size)}`;
+}
+
+async function mOpen(path) {
+  mCur = path; mTab = 'dirs'; mSelect(null);
+  await mRefresh();
+}
+async function mRefresh() {
+  mSummary();
+  document.querySelectorAll('#mTabs button').forEach(b => b.setAttribute('aria-pressed', b.dataset.tab == mTab));
+  $('mCrumbs').hidden = mTab != 'dirs'; $('mQuery').hidden = mTab != 'files';
+  $('mMapBox').hidden = $('mLegend').hidden = mTab == 'types';
+  if (mTab == 'dirs') await mDirs();
+  if (mTab == 'files') await mFiles();
+  if (mTab == 'types') await mTypes();
+}
+
+function mHead(a, b, c, d, e) {
+  const r = el('div', 'mrow mhead');
+  r.append(el('span', '', a), ...[b, c, d, e].map(t => el('span', 'num', t)));
+  return r;
+}
+function mRow(name, path, isDir, size, whole, count, mtime) {
+  const r = el('button', 'mrow' + (isDir ? ' dir' : '')), bar = el('span', 'bar'), fill = el('i');
+  fill.style.width = (whole ? size / whole * 100 : 0) + '%'; bar.append(fill);
+  r.title = path; r.dataset.path = path;
+  r.setAttribute('aria-selected', path == mSelected);
+  r.append(el('span', 'nm', name), bar, el('span', 'num sz', fmt(size)), el('span', 'num', count), el('span', 'num', day(mtime)));
+  r.onclick = () => mSelect(path);
+  if (isDir) {
+    r.ondblclick = () => mOpen(path);
+    r.onkeydown = e => { if (e.key == 'Enter') { e.preventDefault(); mOpen(path); } };
+  }
+  return r;
+}
+async function mDirs() {
+  const d = await api().tree_dir(mCur);
+  if (!d) return mOpen(mInfo.path);
+  const rel = mCur.slice(mInfo.path.length).split(SEP).filter(Boolean), crumbs = [];
+  let p = mInfo.path;
+  crumbs.push(mCrumb(mInfo.path, p));
+  for (const part of rel) { p = joinPath(p, part); crumbs.push(el('span', '', '›'), mCrumb(part, p)); }
+  $('mCrumbs').replaceChildren(...crumbs);
+  const rows = d.items.map(i => mRow(i.name, joinPath(mCur, i.name), i.dir, i.size, d.size, i.dir ? i.count.toLocaleString(lang) : '', i.mtime));
+  if (d.total > d.items.length) rows.push(el('div', 'mrow mhead', t('и ещё {0} поменьше', d.total - d.items.length)));
+  $('mList').replaceChildren(mHead(t('Имя'), t('Доля'), t('Размер'), t('Файлов'), t('Изменён')), ...rows);
+  $('mList').scrollTop = 0;
+  mTree = await api().tree_map(mCur);
+  mLegend();
+  mDraw();
+}
+function mCrumb(text, path) { const b = el('button', '', text); b.onclick = () => mOpen(path); return b; }
+
+async function mFiles() {
+  const rows = await api().tree_files($('mQuery').value.trim());
+  const top = rows[0] ? rows[0].size : 0;
+  $('mList').replaceChildren(mHead(t('Самые большие файлы'), t('Доля'), t('Размер'), '', t('Изменён')),
+    ...rows.map(f => mRow(f.path, f.path, false, f.size, top, '', f.mtime)));
+  mTree = rows.map(f => [f.path, f.size, mKind(f.path), []]);
+  mLegend();
+  mDraw();
+}
+function mKind(name) {
+  const e = name.split('.').pop().toLowerCase();
+  return mExtKind[e] ?? KIND_COLORS.length - 1;
+}
+let mExtKind = {};
+
+async function mTypes() {
+  const t = await api().tree_types(), kinds = [...t.kinds].sort((a, b) => b.size - a.size);
+  const all = kinds.reduce((s, k) => s + k.size, 0), rows = [mHead(t('Тип'), '', t('Размер'), t('Файлов'), t('Доля'))];
+  for (const k of kinds) if (k.count) rows.push(mTypeRow(t(k.name), KIND_COLORS[t.kinds.indexOf(k)], k.size, all, k.count, null));
+  rows.push(mHead(t('Расширение'), '', t('Размер'), t('Файлов'), t('Доля')));
+  for (const e of t.exts) rows.push(mTypeRow(e.ext ? '.' + e.ext : t('без расширения'), KIND_COLORS[e.kind], e.size, all, e.count, e.ext));
+  $('mList').replaceChildren(...rows);
+}
+function mTypeRow(name, color, size, all, count, ext) {
+  const r = el('button', 'mrow'), label = el('span', 'nm'), dot = el('i'), bar = el('span', 'bar'), fill = el('i');
+  dot.style.cssText = `display:inline-block;width:9px;height:11px;margin-right:9px;border-radius:50% 50% 50% 50%/60% 60% 40% 40%;background:${color}`;
+  label.append(dot, name); fill.style.width = (all ? size / all * 100 : 0) + '%'; bar.append(fill);
+  r.append(label, bar, el('span', 'num sz', fmt(size)), el('span', 'num', count.toLocaleString(lang)), el('span', 'num', pct(size, all)));
+  if (ext) { r.title = t('Показать такие файлы'); r.onclick = () => { $('mQuery').value = '.' + ext; mTab = 'files'; mRefresh(); }; }
+  return r;
+}
+
+function mLegend() {
+  const items = S.kinds.map((n, i) => [n, KIND_COLORS[i]]);
+  $('mLegend').replaceChildren(...items.map(([n, c]) => { const s = el('span'), i = el('i'); i.style.background = c; s.append(i, t(n)); return s; }));
+}
+
+function mSelect(path) {
+  mSelected = path;
+  $('mSel').textContent = path || t('Выбери файл или папку'); $('mSel').title = path || '';
+  $('mShow').disabled = $('mDel').disabled = !path;
+  document.querySelectorAll('#mList .mrow[data-path]').forEach(r => r.setAttribute('aria-selected', r.dataset.path == path));
+  mPaint();
+}
+function mDelete() {
+  const path = mSelected;
+  modal(t('В корзину?'), path, []);
+  const yes = el('button', 'act accent wide', t('Удалить')), no = el('button', 'act wide', t('Отмена'));
+  no.onclick = () => $('modal').hidden = true;
+  yes.onclick = async () => {
+    yes.disabled = no.disabled = true;
+    const r = await api().tree_delete(path);
+    if (!r.ok) { $('mText').textContent = t(r.error); no.disabled = false; no.textContent = t('Закрыть'); return; }
+    $('modal').hidden = true;
+    mInfo = await api().tree_info();
+    mSelect(null);
+    await mRefresh();
+    status(t('В корзину отправлено ') + fmt(r.freed));
+  };
+  $('mBtns').replaceChildren(yes, no);
+  no.focus();
+}
+async function mExport() { const p = await api().tree_export(); if (p) status(t('Сохранено: ') + p); }
+
+// схема: вложенные прямоугольники, площадь = размер (алгоритм squarified — прямоугольники близки к квадратам)
+function squarify(kids, x, y, w, h) {
+  const items = kids.filter(c => c[1] > 0).sort((a, b) => b[1] - a[1]), out = [];
+  const total = items.reduce((s, c) => s + c[1], 0);
+  if (!total || w <= 0 || h <= 0) return out;
+  const k = w * h / total;
+  let i = 0;
+  while (i < items.length) {
+    const side = Math.min(w, h), first = items[i][1] * k;
+    let sum = 0, best = Infinity, j = i;
+    for (; j < items.length; j++) {
+      const a = items[j][1] * k, s = sum + a, worst = Math.max(side * side * first / (s * s), s * s / (side * side * a));
+      if (worst > best) break;
+      best = worst; sum = s;
+    }
+    const thick = sum / side;
+    let p = 0;
+    for (let n = i; n < j; n++) {
+      const len = items[n][1] * k / thick;
+      out.push(w >= h ? { n: items[n], x, y: y + p, w: thick, h: len } : { n: items[n], x: x + p, y, w: len, h: thick });
+      p += len;
+    }
+    if (w >= h) { x += thick; w -= thick; } else { y += thick; h -= thick; }
+    i = j;
+  }
+  return out;
+}
+function mDraw() {
+  const box = $('mMapBox'), c = $('mMap'), dpr = devicePixelRatio || 1, W = box.clientWidth, H = box.clientHeight;
+  if (!W || !H) return;
+  c.width = W * dpr; c.height = H * dpr;
+  mPaper = document.createElement('canvas'); mPaper.width = c.width; mPaper.height = c.height;
+  const g = mPaper.getContext('2d');
+  g.scale(dpr, dpr);
+  g.textBaseline = 'top';
+  mLeaves = [];
+  const whole = mTree.reduce((s, k) => s + k[1], 0);
+  const walk = (kids, x, y, w, h, base, top, depth) => {
+    for (const r of squarify(kids, x, y, w, h)) {
+      const [name, size, kindId, sub] = r.n, rest = kindId <= -2, tone = rest ? -2 - kindId : kindId;
+      const path = rest ? base : mTab == 'files' ? name : joinPath(base, name), up = top || (kindId == -1 ? path : null);
+      if (sub.length && r.w > 8 && r.h > 8) {
+        const head = !depth && r.w > 90 && r.h > 56 ? 20 : 0, pad = depth ? 1 : 3;  // крупные папки подписаны сверху
+        if (head) {
+          g.save(); g.beginPath(); g.rect(r.x + 4, r.y, r.w - 8, head + 2); g.clip();
+          g.fillStyle = '#FAF9F5'; g.font = "600 12px 'Inter Tight','Segoe UI',sans-serif";
+          g.fillText(name, r.x + 5, r.y + 5);
+          g.fillStyle = '#B0AEA5'; g.font = "12px 'IBM Plex Mono',Consolas,monospace";
+          g.fillText(fmt(size), r.x + 11 + g.measureText(name).width * 1.05, r.y + 5);
+          g.restore();
+        }
+        walk(sub, r.x + pad, r.y + pad + head, r.w - pad * 2, r.h - pad * 2 - head, path, up, depth + 1);
+        continue;
+      }
+      const leaf = { x: r.x, y: r.y, w: r.w, h: r.h, name, size, path, up, rest };
+      mLeaves.push(leaf);
+      g.fillStyle = kindId == -1 ? KIND_COLORS[6] : KIND_COLORS[tone];
+      g.beginPath(); g.roundRect(r.x + 1, r.y + 1, Math.max(r.w - 2, .5), Math.max(r.h - 2, .5), Math.min(3, r.w / 3, r.h / 3)); g.fill();
+      if (r.w > 64 && r.h > 22) {
+        g.save(); g.beginPath(); g.rect(r.x + 7, r.y + 5, r.w - 12, r.h - 8); g.clip();
+        g.fillStyle = tone == 6 || kindId == -1 ? '#FAF9F5' : '#1F1E1D';
+        g.font = "600 12px 'Inter Tight','Segoe UI',sans-serif";
+        g.fillText((mTab == 'files' ? name : rest ? base : name).split(SEP).filter(Boolean).pop(), r.x + 7, r.y + 6);
+        if (r.h > 38) { g.font = "12px 'IBM Plex Mono',Consolas,monospace"; g.fillText(fmt(size), r.x + 7, r.y + 22); }
+        g.restore();
+      }
+    }
+  };
+  walk(mTree, 0, 0, W, H, mCur, null, 0);
+  mPaint();
+}
+function mPaint() {
+  const c = $('mMap'), dpr = devicePixelRatio || 1;
+  if (!mPaper || !c.width) return;
+  const g = c.getContext('2d');
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.clearRect(0, 0, c.width, c.height);
+  g.drawImage(mPaper, 0, 0);
+  g.scale(dpr, dpr);
+  const ring = (l, color) => { g.strokeStyle = color; g.lineWidth = 2; g.strokeRect(l.x + 1, l.y + 1, Math.max(l.w - 2, 1), Math.max(l.h - 2, 1)); };
+  if (mSelected) for (const l of mLeaves) if (l.path == mSelected || l.path.startsWith(mSelected + SEP)) ring(l, '#F2C14E');
+  if (mHover) ring(mHover, '#FAF9F5');
+}
+function mHit(e) {
+  const b = $('mMap').getBoundingClientRect(), x = e.clientX - b.left, y = e.clientY - b.top;
+  return mLeaves.find(l => x >= l.x && x < l.x + l.w && y >= l.y && y < l.y + l.h) || null;
+}
+$('mMap').onmousemove = e => {
+  const l = mHit(e), tip = $('mTip');
+  if (l != mHover) { mHover = l; mPaint(); }
+  tip.hidden = !l;
+  if (!l) return;
+  tip.replaceChildren(el('b', '', l.rest ? t('Мелкие файлы: ') + l.path : l.path), el('span', '', `${fmt(l.size)} · ${pct(l.size, mTree.reduce((s, k) => s + k[1], 0))}`));
+  tip.style.left = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 8) + 'px';
+  tip.style.top = Math.min(e.clientY + 14, innerHeight - tip.offsetHeight - 8) + 'px';
+};
+$('mMap').onmouseleave = () => { mHover = null; $('mTip').hidden = true; mPaint(); };
+$('mMap').onclick = e => { const l = mHit(e); if (l) mSelect(l.path); };
+$('mMap').ondblclick = e => { const l = mHit(e); if (l && l.up && mTab == 'dirs') mOpen(l.up); };
+new ResizeObserver(() => { if (mInfo) mDraw(); }).observe($('mMapBox'));
+document.querySelectorAll('#mTabs button').forEach(b => b.onclick = () => { mTab = b.dataset.tab; mSelect(null); mRefresh(); });
+let mQueryTimer = 0;
+$('mQuery').oninput = () => { clearTimeout(mQueryTimer); mQueryTimer = setTimeout(mRefresh, 350); };
+
+// строка-переключатель: яйцо-отметка, название, справа теги; клик/пробел — вкл/выкл
+function toggleRow(name, right, on, fn) {
+  const r = el('button', 'row' + (on ? '' : ' off'));
+  r.setAttribute('role', 'checkbox'); r.setAttribute('aria-checked', on);
+  r.onclick = e => { if (!e.target.closest('.mini')) fn(); };
+  const t = el('span', 'tags'); t.append(...right);
+  r.append(el('i', 'sq' + (on ? ' on' : '')), el('span', 'name', name), t);
+  return r;
+}
+function stepper(text, onMinus, onPlus, label) {
+  const s = el('span', 'tags'), m = el('button', 'mini', '−'), p = el('button', 'mini', '+');
+  m.setAttribute('aria-label', label + t(' меньше')); p.setAttribute('aria-label', label + t(' больше'));
+  m.onclick = onMinus; p.onclick = onPlus; s.append(m, tag(text), p); return s;
+}
+
+function render() {
+  const on = S.applied;
+  $('alBtn').textContent = on ? t('Выключить и вернуть как было') : t('Включить оптимизацию');
+  $('alBtn').className = 'act' + (on ? '' : ' accent');
+  $('alHint').textContent = on
+    ? t('Работает. Окно можно закрыть — программа останется в трее.')
+    : t('План питания, таймер 0.5 мс, без Game DVR. Всё возвращается одной кнопкой.');
+  $('tYolk').textContent = on ? t('включена') : t('выключена');
+  $('yolkDot').classList.toggle('on', on);
+  $('vTimer').replaceChildren(tag(S.timer.toFixed(2) + t(' мс'), S.timer <= 1 ? 'yolk' : ''), tag(t('обычно 15.6'), 'muted'));
+  $('vPlan').textContent = $('vPlan').title = S.plan;
+  $('vAgent').replaceChildren(tag(S.agent ? t('работает') : t('выключена'), S.agent ? 'yolk' : 'muted'));
+
+  $('cats').replaceChildren(...S.cats.map((c, i) =>
+    toggleRow(t(c.name), [tag(t(c.note), 'muted note'), tag(sizes[i] == null ? '…' : fmt(sizes[i]), c.on ? '' : 'muted')], c.on, () => {
+      c.on = !c.on; api().put('cats', S.cats.map(x => x.on)); render();
+    })));
+  const total = S.cats.reduce((s, c, i) => s + (c.on ? sizes[i] || 0 : 0), 0);
+  $('diskTotal').textContent = sizes.length ? t('Можно освободить ') + fmt(total) : t('Считаю…');
+  $('tShell').textContent = sizes.length ? fmt(total) : '…';
+  $('dirt').style.opacity = Math.min(1, total / 2 ** 30);  // чем больше мусора, тем грязнее скорлупа; полная — от 1 ГБ
+  $('diskBtn').querySelector('.label').textContent = sizes.length && total ? t('Очистить ') + fmt(total) : t('Очистить');
+  $('diskBtn').disabled = busy || !total;
+  $('diskBtn').classList.toggle('accent', !!total);
+
+  $('tTray').textContent = S.agent ? t('работает в фоне') : t('фон выключен');
+  $('tray').replaceChildren(toggleRow(t('Держать в трее и запускать вместе с Windows'),
+    [tag(S.agent ? t('работает') : t('выключено'), S.agent ? 'yolk' : 'muted')], S.tray_on, () => setAgent('tray_on')));
+
+  $('auto').replaceChildren(
+    toggleRow(t('Чистить, когда память занята больше чем'), [stepper(S.auto_pct + '%',
+      () => setNum('auto_pct', S.auto_pct - 5, 10, 99), () => setNum('auto_pct', S.auto_pct + 5, 10, 99), t('Порог'))],
+      S.auto_on, () => setAgent('auto_on')),
+    toggleRow(t('Чистить по расписанию, каждые'), [stepper(S.int_min + t(' мин'),
+      () => setNum('int_min', S.int_min - 5, 5, 1440), () => setNum('int_min', S.int_min + 5, 5, 1440), t('Интервал'))],
+      S.int_on, () => setAgent('int_on')));
+  $('areas').replaceChildren(...S.areas.map(a =>
+    toggleRow(t(a.name), [tag(t(a.note), 'muted note')], !!(S.mask & a.flag), () => { S.mask ^= a.flag; api().put('ram_mask', S.mask); render(); })));
+  $('areasSummary').textContent = t('Что чистить: {0} из {1}', S.areas.filter(a => S.mask & a.flag).length, S.areas.length);
+}
+
+async function setAgent(key) {
+  S[key] = !S[key]; render();
+  await api().put(key, S[key]);
+  S.agent = await api().agent(); render();
+}
+function setNum(key, v, min, max) { S[key] = Math.min(max, Math.max(min, v)); api().put(key, S[key]); render(); }
+
+async function poll() {
+  const m = await api().mem();
+  $('ramText').textContent = t('Занято {0} из {1}', fmt(m.used), fmt(m.total));
+  $('ramBar').style.width = m.load + '%';
+  $('tRam').textContent = `${m.load}%`;
+  $('ramFill').setAttribute('y', 76 - 76 * m.load / 100);
+  if (!busy) status(S.applied ? t('Оптимизация включена') : t('Готово'));
+}
+
+async function task(text, fn) {
+  if (busy) return;
+  busy = true; status(text, true);
+  document.querySelectorAll('.act, .ibtn').forEach(b => b.disabled = true);
+  try { return await fn(); }
+  catch (e) { status(t('Ошибка: ') + e); }
+  finally {
+    busy = false;
+    document.querySelectorAll('.act, .ibtn').forEach(b => b.disabled = false);
+    render(); poll();
+  }
+}
+
+const scan = () => task(t('Считаю мусор на диске'), async () => { sizes = await api().scan(); });
+const cleanDisk = () => peelTask($('diskBtn'), t('Очищаю диск'), async () => {
+  $('diskResult').textContent = t('освобождено ') + fmt(await api().clean_disk());
+  sizes = await api().scan();
+});
+const cleanRam = () => peelTask($('ramBtn'), t('Очищаю память'), async () => {
+  $('ramResult').textContent = t('освобождено ') + fmt(await api().clean_ram());
+});
+
+function modal(title, text, steps) {
+  $('mTitle').textContent = title; $('mText').textContent = text;
+  $('steps').replaceChildren(...steps.map((s, i) => {
+    const li = el('li'); li.append(el('span', 'n', String(i + 1).padStart(2, '0')), el('span', '', s), tag(t('ждёт'), 'muted'));
+    return li;
+  }));
+  $('mBtns').replaceChildren();
+  $('modal').hidden = false;
+}
+function mark(i, t, ok = true) { const g = $('steps').children[i].lastChild; g.textContent = t; g.className = 'tag' + (ok ? ' yolk' : ''); }
+
+async function antilag() {
+  if (busy) return;
+  const turnOn = !S.applied;
+  modal(turnOn ? t('Включение') : t('Выключение'), turnOn ? t('Настраиваю систему и чищу компьютер. Это займёт до минуты.') : t('Возвращаю все настройки, как было до включения.'),
+    turnOn ? [t('План питания как в AntiLag'), t('Таймеры, видеокарта, Game DVR'), t('Работа в фоне и значок в трее'),
+              t('Кэш NVIDIA'), t('Очистка диска'), t('Очистка памяти')]
+           : [t('Прежний план питания'), t('Таймеры, видеокарта, Game DVR'), t('Фоновый режим')]);
+  await task(turnOn ? t('Включаю оптимизацию') : t('Возвращаю настройки'), async () => {
+    const r = await api().antilag();
+    r.ok.forEach((ok, i) => mark(i, ok ? t('готово') : t('ошибка'), ok));
+    S.applied = r.on; S.agent = r.agent;
+    if (turnOn) {
+      mark(3, fmt(r.nv));
+      mark(4, t('идёт…'), false); const d = await api().clean_disk(); mark(4, fmt(d));
+      mark(5, t('идёт…'), false); const f = await api().clean_ram(); mark(5, fmt(f));
+      $('diskResult').textContent = t('освобождено ') + fmt(d); $('ramResult').textContent = t('освобождено ') + fmt(f);
+      sizes = await api().scan();
+    }
+    Object.assign(S, await api().sysinfo());
+  });
+  $('mTitle').textContent = t('Перезагрузить?');
+  $('mText').textContent = t('Часть настроек (таймеры и реестр) заработает только после перезагрузки.');
+  const now = el('button', 'act accent wide', t('Перезагрузить')), later = el('button', 'act wide', t('Позже'));
+  now.onclick = () => { api().reboot(); $('mText').textContent = t('Перезагрузка через 5 секунд…'); now.disabled = later.disabled = true; };
+  later.onclick = () => $('modal').hidden = true;
+  $('mBtns').replaceChildren(now, later);
+  now.focus();
+}
+
+window.addEventListener('pywebviewready', async () => {
+  S = await api().get(); lang = S.lang; mExtKind = S.ext_kinds;
+  $('vVer').textContent = S.version; translatePage();
+  render(); poll(); setInterval(poll, 2000); scan(); updCheck();
+});
+</script>
+</body>
+</html>
