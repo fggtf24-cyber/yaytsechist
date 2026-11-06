@@ -13,6 +13,7 @@ from ctypes import byref, sizeof, wintypes
 from pathlib import Path
 
 STATE = Path(os.environ["LOCALAPPDATA"]) / "GameBoost" / "state.json"
+AUTO_LOG = STATE.with_name("auto.json")  # когда агент чистил в последний раз; отдельно, чтобы не спорить с окном за state.json
 FROZEN = getattr(sys, "frozen", False)  # запущено как Яйцечист.exe (PyInstaller)
 ASSETS = Path(getattr(sys, "_MEIPASS", Path(__file__).parent))
 EXE = sys.executable if FROZEN else sys.executable.replace("python.exe", "pythonw.exe")
@@ -217,6 +218,10 @@ def open_gui():
     subprocess.Popen(f'"{EXE}" {SCRIPT}', creationflags=subprocess.DETACHED_PROCESS)
 
 
+def auto_clean(mask):
+    AUTO_LOG.write_text(json.dumps({"time": time.time(), "freed": clean_ram(mask)}), "utf-8")
+
+
 def agent():
     """Фон: держит таймер, чистит RAM по условиям, показывает значок в трее (как AntiLag)."""
     import pystray
@@ -238,10 +243,10 @@ def agent():
             now, m = time.time(), mem()
             mask = st["ram_mask"] & ~FREEZES  # как Mem Reduct: авто — без «подвисающих» областей
             if st["auto_on"] and m["load"] >= st["auto_pct"] and now - last >= 30:
-                clean_ram(mask)
+                auto_clean(mask)
                 last = now
             if st["int_on"] and now - last_int >= st["int_min"] * 60:
-                clean_ram(mask)
+                auto_clean(mask)
                 last = last_int = now
             icon.title = tr(f"Яйцечист · таймер {query_timer():.2f} мс · RAM {m['load']}%", f"Yaytsechist · timer {query_timer():.2f} ms · RAM {m['load']}%")
             time.sleep(5)
@@ -506,6 +511,7 @@ KINDS = [("Видео", "mp4 mkv avi mov wmv webm m4v ts flv mpg mpeg"),
 KIND_OF = {e: i for i, (_, exts) in enumerate(KINDS) for e in exts.split()}
 CLOUD = 0x1000 | 0x40000 | 0x400000  # OFFLINE, RECALL_ON_OPEN, RECALL_ON_DATA_ACCESS: файл в облаке, на диске не лежит
 TOP_FILES, LIST_LIMIT = 500, 400
+SAVE_LOCK = threading.Lock()
 UPDATE = None  # что нашла последняя проверка обновлений
 TREE = None  # последнее сканирование; не атрибут Api, иначе pywebview полезет обходить всё дерево
 
@@ -740,7 +746,7 @@ def save(data):
 
 # ---------- обновление и язык ----------
 
-VERSION = "1.0.1"
+VERSION = "1.0.2"
 REPO, ASSET = "fggtf24-cyber/yaytsechist", "Yaytsechist.exe"
 TITLES = {"ru": "Яйцечист", "en": "Yaytsechist"}
 
@@ -752,6 +758,13 @@ def lang_of(st):
 
 def tr(ru, en):
     return en if lang_of(load()) == "en" else ru
+
+
+def make_shortcut(lnk, exe):
+    """Windows ищет программы по ярлыкам в «Пуске»: без него «яйцечист» не найдётся, файл-то называется латиницей."""
+    q = lambda s: s.replace("'", "''")
+    ps(f"$s=(New-Object -ComObject WScript.Shell).CreateShortcut('{q(lnk)}');"
+       f"if($s.TargetPath -ne '{q(exe)}'){{$s.TargetPath='{q(exe)}';$s.WorkingDirectory='{q(os.path.dirname(exe))}';$s.Save()}}")
 
 
 def find_window():
@@ -830,15 +843,22 @@ class Api:
     def agent(self):
         return agent_running()
 
+    def auto_last(self):
+        try:
+            return json.loads(AUTO_LOG.read_text("utf-8"))
+        except (OSError, ValueError):
+            return None
+
     def mem(self):
         return mem()
 
     def put(self, key, value):
         if key not in DEFAULTS or key == "applied":
             return
-        st = load()
-        st[key] = value
-        save(st)
+        with SAVE_LOCK:  # pywebview вызывает методы из разных потоков: две записи подряд не должны затереть друг друга
+            st = load()
+            st[key] = value
+            save(st)
         if key in ("auto_on", "int_on", "tray_on"):
             sync_agent(st)
         if key == "lang":
@@ -1012,6 +1032,9 @@ def gui(check=False):
         os._exit(1)
 
     def started():
+        if FROZEN:
+            programs = Path(os.environ["APPDATA"]) / "Microsoft" / "Windows" / "Start Menu" / "Programs"
+            threading.Thread(target=make_shortcut, args=(str(programs / f"{TITLES[lang_of(load())]}.lnk"), sys.executable), daemon=True).start()
         titlebar()
         if check:
             probe()
@@ -1085,6 +1108,10 @@ def selftest():
         cat = ("ae", cache_patterns([tmp]), 0, False)
         assert scan(cat) == 7 and clean(cat) == 7
         assert os.path.exists(os.path.join(tmp, "project.aep")), "очистка кэша удалила файл пользователя"
+    with tempfile.TemporaryDirectory() as tmp:
+        lnk = os.path.join(tmp, "Яйцечист.lnk")
+        make_shortcut(lnk, r"C:\Windows\notepad.exe")
+        assert os.path.exists(lnk), "ярлык с русским именем не создался"
     assert human(1536) == "2 КБ" and human(5 * 1024 ** 3) == "5.0 ГБ"
     bcd = "identifier              {current}\nuseplatformtick         Yes\ndisabledynamictick      Да\nnx  OptIn\n"
     assert parse_bcd(bcd) == {"useplatformtick": "yes", "disabledynamictick": "yes"}, parse_bcd(bcd)
