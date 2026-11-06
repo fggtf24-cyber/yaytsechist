@@ -223,6 +223,12 @@ def exit_label():
     return tr("Выход (таймер 0.5 мс отключится)", "Exit (0.5 ms timer will stop)") if load()["applied"] else tr("Выход", "Exit")
 
 
+def quit_agent(icon):
+    """icon.stop() тут не годится: цикл агента идёт дальше, пока нужен фон, и процесс остаётся жить."""
+    icon.visible = False
+    os._exit(0)
+
+
 def auto_clean(mask):
     AUTO_LOG.write_text(json.dumps({"time": time.time(), "freed": clean_ram(mask)}), "utf-8")
 
@@ -245,7 +251,7 @@ def agent():
     menu = pystray.Menu(
         pystray.MenuItem(lambda item: tr("Открыть Яйцечист", "Open Yaytsechist"), lambda: open_gui(), default=True),
         pystray.MenuItem(lambda item: tr("Очистить память", "Clean memory"), lambda: clean_ram(load()["ram_mask"])),
-        pystray.MenuItem(lambda item: exit_label(), lambda icon: icon.stop()))
+        pystray.MenuItem(lambda item: exit_label(), quit_agent))
     icon = pystray.Icon("GameBoost", Image.open(ASSETS / "icon.ico"), "Яйцечист", menu)
 
     def loop(icon):
@@ -762,7 +768,7 @@ def save(data):
 
 # ---------- обновление и язык ----------
 
-VERSION = "1.0.5"
+VERSION = "1.0.6"
 REPO, ASSET = "fggtf24-cyber/yaytsechist", "Yaytsechist.exe"
 TITLES = {"ru": "Яйцечист", "en": "Yaytsechist"}
 
