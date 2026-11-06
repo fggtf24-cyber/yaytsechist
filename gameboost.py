@@ -215,7 +215,7 @@ def agent_running():
 
 
 def open_gui():
-    subprocess.Popen(f'"{EXE}" {SCRIPT}', creationflags=subprocess.DETACHED_PROCESS)
+    subprocess.Popen(f'"{EXE}" {SCRIPT}', env=fresh_env(), creationflags=subprocess.DETACHED_PROCESS)
 
 
 def exit_label():
@@ -762,7 +762,7 @@ def save(data):
 
 # ---------- обновление и язык ----------
 
-VERSION = "1.0.4"
+VERSION = "1.0.5"
 REPO, ASSET = "fggtf24-cyber/yaytsechist", "Yaytsechist.exe"
 TITLES = {"ru": "Яйцечист", "en": "Yaytsechist"}
 
@@ -817,11 +817,25 @@ def update_download(info, dest):
         raise
 
 
+def drop_old(exe):
+    for old in glob.glob(glob.escape(exe) + ".old*"):
+        try:
+            os.remove(old)
+        except OSError:
+            pass  # ещё занят, удалится в следующий раз
+
+
+def fresh_env():
+    """Без RESET новый процесс решит, что он дочерний, и возьмёт временную папку, а с ней и код, запустившей его версии."""
+    return {**os.environ, "PYINSTALLER_RESET_ENVIRONMENT": "1"}
+
+
 def swap_exe(new, exe):
     """Запущенный exe нельзя перезаписать, но можно переименовать. Если подмена сорвалась, старый возвращается на место."""
+    drop_old(exe)
     old = exe + ".old"
-    if os.path.exists(old):
-        os.remove(old)
+    if os.path.exists(old):  # из него ещё работает прежний агент, а такой файл Windows удалить не даст
+        old += str(int(time.time()))
     os.replace(exe, old)
     try:
         os.replace(new, exe)
@@ -836,9 +850,7 @@ def update_apply(info, restart=True):
     swap_exe(exe + ".new", exe)
     if restart:
         ps("if(Get-ScheduledTask GameBoost -EA 0){Stop-ScheduledTask GameBoost -EA 0;Start-ScheduledTask GameBoost}")
-        # без RESET новый процесс решит, что он дочерний, и возьмёт временную папку старого, которая сейчас удалится
-        subprocess.Popen([exe, "--updated"], env={**os.environ, "PYINSTALLER_RESET_ENVIRONMENT": "1"},
-                         creationflags=subprocess.DETACHED_PROCESS)
+        subprocess.Popen([exe, "--updated"], env=fresh_env(), creationflags=subprocess.DETACHED_PROCESS)
         os._exit(0)
 
 
@@ -1014,11 +1026,8 @@ def gui(check=False):
     import webview
     if "--updated" in sys.argv:
         time.sleep(2)  # старая версия ещё закрывается и держит мьютекс окна
-    if FROZEN and os.path.exists(sys.executable + ".old"):
-        try:
-            os.remove(sys.executable + ".old")
-        except OSError:
-            pass  # ещё занят фоновым агентом, удалится при следующем запуске
+    if FROZEN:
+        drop_old(sys.executable)
     ctypes.WinDLL("kernel32", use_last_error=True).CreateMutexW(None, False, "GameBoostWindow")
     if ctypes.get_last_error() == 183 and not check:  # ERROR_ALREADY_EXISTS — окно уже открыто, показать его
         u32 = ctypes.windll.user32
@@ -1109,6 +1118,12 @@ def selftest():
         update_download(good, dest)
         swap_exe(dest, exe)
         assert Path(exe).read_bytes() == b"new" and Path(exe + ".old").read_bytes() == b"old" and not os.path.exists(dest)
+        Path(dest).write_bytes(b"newer")
+        with open(exe + ".old"):  # занят, как файл работающей программы
+            swap_exe(dest, exe)
+        assert Path(exe).read_bytes() == b"newer" and len(glob.glob(glob.escape(exe) + ".old*")) == 2, "занятый .old сорвал обновление"
+        drop_old(exe)
+        assert not glob.glob(glob.escape(exe) + ".old*")
     prefs = '["Disk Cache Controls"]\n\t"Enabled 2" = "1"\n\t"Folder 7" = "D:\\Кэш"\n\t"Max Size 3" = "94"\n\n["Other"]\n\t"Folder 1" = "C:\\no"\n'
     assert ae_prefs_folders(prefs) == ["D:\\Кэш"], ae_prefs_folders(prefs)
     hexed = '["Disk Cache Controls"]\n\t"Folder 9" = "E:\\"D09AD18D"\\a"\\\n\t\t"bc"\n\t"Max Size 3" = "94"\n'

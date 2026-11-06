@@ -364,7 +364,7 @@ async function updInstall() {
   $('updGo').disabled = true;
   $('updText').textContent = t('Скачиваю обновление…');
   const r = await api().update_install();  // при успехе программа перезапускается и сюда не возвращается
-  if (!r.ok) { $('updText').textContent = t('Не вышло обновиться. Попробуй позже.'); $('updGo').disabled = false; }
+  if (!r.ok) { $('updText').textContent = t('Не вышло обновиться. Попробуй позже.'); $('updText').title = r.error; $('updGo').disabled = false; }
 }
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let S = null, sizes = [], busy = false;
