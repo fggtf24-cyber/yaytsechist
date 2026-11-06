@@ -222,11 +222,21 @@ def auto_clean(mask):
     AUTO_LOG.write_text(json.dumps({"time": time.time(), "freed": clean_ram(mask)}), "utf-8")
 
 
+def kill_other_agents():
+    """Exe из PyInstaller — это два процесса: оболочка и сама программа. Планировщик, останавливая задачу, завершает
+    только оболочку, а программа живёт дальше со своим значком в трее. Поэтому новый агент сам убирает прежние."""
+    if FROZEN:
+        name = os.path.basename(sys.executable).replace("'", "''")
+        ps(f"Get-CimInstance Win32_Process|?{{$_.Name -like '{name}*' -and $_.CommandLine -like '*--agent*' -and "
+           f"$_.ProcessId -notin {os.getpid()},{os.getppid()}}}|%{{Stop-Process -Id $_.ProcessId -Force -EA 0}}")
+
+
 def agent():
     """Фон: держит таймер, чистит RAM по условиям, показывает значок в трее (как AntiLag)."""
     import pystray
     from PIL import Image
 
+    kill_other_agents()
     menu = pystray.Menu(
         pystray.MenuItem(lambda item: tr("Открыть Яйцечист", "Open Yaytsechist"), lambda: open_gui(), default=True),
         pystray.MenuItem(lambda item: tr("Очистить память", "Clean memory"), lambda: clean_ram(load()["ram_mask"])),
@@ -746,7 +756,7 @@ def save(data):
 
 # ---------- обновление и язык ----------
 
-VERSION = "1.0.2"
+VERSION = "1.0.3"
 REPO, ASSET = "fggtf24-cyber/yaytsechist", "Yaytsechist.exe"
 TITLES = {"ru": "Яйцечист", "en": "Yaytsechist"}
 
@@ -819,7 +829,7 @@ def update_apply(info, restart=True):
     update_download(info, exe + ".new")
     swap_exe(exe + ".new", exe)
     if restart:
-        ps("if((Get-ScheduledTask GameBoost -EA 0).State -eq 'Running'){Stop-ScheduledTask GameBoost;Start-ScheduledTask GameBoost}")
+        ps("if(Get-ScheduledTask GameBoost -EA 0){Stop-ScheduledTask GameBoost -EA 0;Start-ScheduledTask GameBoost}")
         # без RESET новый процесс решит, что он дочерний, и возьмёт временную папку старого, которая сейчас удалится
         subprocess.Popen([exe, "--updated"], env={**os.environ, "PYINSTALLER_RESET_ENVIRONMENT": "1"},
                          creationflags=subprocess.DETACHED_PROCESS)
