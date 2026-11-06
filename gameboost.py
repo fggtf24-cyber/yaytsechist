@@ -218,6 +218,11 @@ def open_gui():
     subprocess.Popen(f'"{EXE}" {SCRIPT}', creationflags=subprocess.DETACHED_PROCESS)
 
 
+def exit_label():
+    """Таймер 0.5 мс живёт, пока жив агент: только при включённой оптимизации выход меняет отклик."""
+    return tr("Выход (таймер 0.5 мс отключится)", "Exit (0.5 ms timer will stop)") if load()["applied"] else tr("Выход", "Exit")
+
+
 def auto_clean(mask):
     AUTO_LOG.write_text(json.dumps({"time": time.time(), "freed": clean_ram(mask)}), "utf-8")
 
@@ -240,7 +245,7 @@ def agent():
     menu = pystray.Menu(
         pystray.MenuItem(lambda item: tr("Открыть Яйцечист", "Open Yaytsechist"), lambda: open_gui(), default=True),
         pystray.MenuItem(lambda item: tr("Очистить память", "Clean memory"), lambda: clean_ram(load()["ram_mask"])),
-        pystray.MenuItem(lambda item: tr("Выход (до перезагрузки)", "Exit (until restart)"), lambda icon: icon.stop()))
+        pystray.MenuItem(lambda item: exit_label(), lambda icon: icon.stop()))
     icon = pystray.Icon("GameBoost", Image.open(ASSETS / "icon.ico"), "Яйцечист", menu)
 
     def loop(icon):
@@ -250,6 +255,7 @@ def agent():
             if bool(st["applied"]) != timer:
                 timer = bool(st["applied"])
                 set_timer(timer)
+                icon.update_menu()
             now, m = time.time(), mem()
             mask = st["ram_mask"] & ~FREEZES  # как Mem Reduct: авто — без «подвисающих» областей
             if st["auto_on"] and m["load"] >= st["auto_pct"] and now - last >= 30:
@@ -756,7 +762,7 @@ def save(data):
 
 # ---------- обновление и язык ----------
 
-VERSION = "1.0.3"
+VERSION = "1.0.4"
 REPO, ASSET = "fggtf24-cyber/yaytsechist", "Yaytsechist.exe"
 TITLES = {"ru": "Яйцечист", "en": "Yaytsechist"}
 
