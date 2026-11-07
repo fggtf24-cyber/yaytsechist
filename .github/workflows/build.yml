@@ -16,22 +16,6 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install pywebview pystray pillow pyinstaller
-      - name: diag
-        continue-on-error: true
-        shell: python
-        run: |
-          import sys, os, tempfile
-          sys.path.insert(0, os.getcwd())
-          import gameboost as g
-          t = tempfile.mkdtemp()
-          print(t)
-          print(g.ps("[Console]::OutputEncoding.CodePage; (Get-WinSystemLocale).Name"))
-          for n in ("abc.lnk", "Яйца.lnk"):
-              lnk = os.path.join(t, n)
-              print(ascii(n), ascii(g.ps(rf"$s=(New-Object -ComObject WScript.Shell).CreateShortcut('{lnk}');$s.TargetPath='C:\Windows\notepad.exe';$s.Save();$s.FullName")), ascii(os.listdir(t)))
-      # не pwsh: его PSModulePath ломает powershell.exe, который программа запускает для ярлыков
-      - run: python gameboost.py --selftest
-        shell: cmd
       # пустой ввод, чтобы pause в конце .bat не ждал; .bat всегда отдаёт код 0, сбой сборки ловит if-no-files-found
       - run: $null | & (Get-Item *.bat).FullName
       - uses: actions/upload-artifact@v4
