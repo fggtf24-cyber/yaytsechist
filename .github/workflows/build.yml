@@ -16,7 +16,9 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install pywebview pystray pillow pyinstaller
+      # не pwsh: его PSModulePath ломает powershell.exe, который программа запускает для ярлыков
       - run: python gameboost.py --selftest
+        shell: cmd
       # пустой ввод, чтобы pause в конце .bat не ждал; .bat всегда отдаёт код 0, сбой сборки ловит if-no-files-found
       - run: $null | & (Get-Item *.bat).FullName
       - uses: actions/upload-artifact@v4
