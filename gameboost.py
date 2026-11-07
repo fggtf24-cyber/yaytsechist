@@ -13,6 +13,8 @@ from ctypes import byref, sizeof, wintypes
 from pathlib import Path
 
 STATE = Path(os.environ["LOCALAPPDATA"]) / "GameBoost" / "state.json"
+SHOW_FLAG = STATE.with_name("show")  # просьба к агенту показать окно
+AGENT_MUTEX = "GameBoostAgent"
 AUTO_LOG = STATE.with_name("auto.json")  # когда агент чистил в последний раз; отдельно, чтобы не спорить с окном за state.json
 FROZEN = getattr(sys, "frozen", False)  # запущено как Яйцечист.exe (PyInstaller)
 ASSETS = Path(getattr(sys, "_MEIPASS", Path(__file__).parent))
@@ -215,7 +217,27 @@ def agent_running():
 
 
 def open_gui():
-    subprocess.Popen(f'"{EXE}" {SCRIPT}', env=fresh_env(), creationflags=subprocess.DETACHED_PROCESS)
+    subprocess.Popen(f'"{EXE}" {SCRIPT}--window', env=fresh_env(), creationflags=subprocess.DETACHED_PROCESS)
+
+
+def agent_alive():
+    """Мьютекс создан с правами администратора, поэтому обычному процессу в него «отказано», и это тоже значит «есть»."""
+    k = ctypes.WinDLL("kernel32", use_last_error=True)
+    return bool(k.OpenMutexW(0x100000, False, AGENT_MUTEX)) or ctypes.get_last_error() == 5  # SYNCHRONIZE, ACCESS_DENIED
+
+
+def wake_agent():
+    """Повторный запуск: окно открывает уже работающий агент, поэтому нет ни второй копии, ни запроса прав."""
+    ctypes.windll.user32.AllowSetForegroundWindow(-1)  # ASFW_ANY: иначе окно не сможет выйти на передний план
+    SHOW_FLAG.touch()
+
+
+def watch_show():
+    while True:
+        time.sleep(.3)
+        if SHOW_FLAG.exists():
+            SHOW_FLAG.unlink(missing_ok=True)
+            open_gui()
 
 
 def exit_label():
@@ -248,6 +270,8 @@ def agent():
     from PIL import Image
 
     kill_other_agents()
+    k32.CreateMutexW(None, False, AGENT_MUTEX)
+    SHOW_FLAG.unlink(missing_ok=True)
     menu = pystray.Menu(
         pystray.MenuItem(lambda item: tr("Открыть Яйцечист", "Open Yaytsechist"), lambda: open_gui(), default=True),
         pystray.MenuItem(lambda item: tr("Очистить память", "Clean memory"), lambda: clean_ram(load()["ram_mask"])),
@@ -256,6 +280,7 @@ def agent():
 
     def loop(icon):
         icon.visible = True
+        threading.Thread(target=watch_show, daemon=True).start()
         st, timer, last, last_int = load(), False, 0.0, time.time()
         while wanted(st):
             if bool(st["applied"]) != timer:
@@ -768,7 +793,7 @@ def save(data):
 
 # ---------- обновление и язык ----------
 
-VERSION = "1.0.7"
+VERSION = "1.0.8"
 REPO, ASSET = "fggtf24-cyber/yaytsechist", "Yaytsechist.exe"
 TITLES = {"ru": "Яйцечист", "en": "Yaytsechist"}
 
@@ -865,7 +890,7 @@ class Api:
 
     def get(self):
         st = load()
-        return {**self.sysinfo(), "applied": bool(st["applied"]), "agent": agent_running(),
+        return {**self.sysinfo(), "applied": bool(st["applied"]), "agent": agent_alive(),
                 "cats": [{"name": c[0], "note": c[4], "on": on} for c, on in zip(CATEGORIES, st["cats"])],
                 "areas": [{"flag": f, "name": n, "note": t} for f, n, t in RAM_AREAS],
                 "kinds": [k[0] for k in KINDS] + ["Другое"], "ext_kinds": KIND_OF, "lang": lang_of(st), "version": VERSION,
@@ -1141,6 +1166,7 @@ def selftest():
     with tempfile.TemporaryDirectory() as tmp:
         os.makedirs(os.path.join(tmp, "Media Cache Files"))
         Path(tmp, "Media Cache Files", "a.cfa").write_bytes(b"x" * 7)
+        os.utime(os.path.join(tmp, "Media Cache Files", "a.cfa"), (time.time() - 60,) * 2)  # time.time() грубее файловых часов
         Path(tmp, "project.aep").write_bytes(b"x" * 100)
         cat = ("ae", cache_patterns([tmp]), 0, False)
         assert scan(cat) == 7 and clean(cat) == 7
@@ -1176,6 +1202,8 @@ if __name__ == "__main__":
         if ver(info["version"]) <= ver(VERSION):
             sys.exit(2)
         update_apply(info, restart=False)
+    elif not {"--window", "--updated"} & set(sys.argv) and agent_alive():
+        wake_agent()
     elif not ctypes.windll.shell32.IsUserAnAdmin():
         ctypes.windll.shell32.ShellExecuteW(None, "runas", EXE, SCRIPT, None, 1)
     else:
