@@ -1,0 +1,26 @@
+name: build
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  PYTHONIOENCODING: utf-8
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pywebview pystray pillow pyinstaller
+      - run: python gameboost.py --selftest
+      # пустой ввод, чтобы pause в конце .bat не ждал; .bat всегда отдаёт код 0, сбой сборки ловит if-no-files-found
+      - run: $null | & (Get-Item *.bat).FullName
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Yaytsechist-windows
+          path: Яйцечист.exe
+          if-no-files-found: error
