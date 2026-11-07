@@ -367,7 +367,7 @@ async function updInstall() {
   if (!r.ok) { $('updText').textContent = t('Не вышло обновиться. Попробуй позже.'); $('updText').title = r.error; $('updGo').disabled = false; }
 }
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-let S = null, sizes = [], busy = false;
+let S = null, sizes = [], busy = false, scanning = false;
 
 function fmt(n) {
   if (n == null) return '—';
@@ -441,6 +441,7 @@ document.querySelectorAll('.cell').forEach(c => c.onclick = () => {
   document.querySelectorAll('.cell').forEach(x => x === c ? x.setAttribute('aria-current', 'page') : x.removeAttribute('aria-current'));
   document.querySelectorAll('section').forEach(v => v.hidden = v.id !== c.dataset.view);
   if (c.dataset.view == 's5' && !mInfo && $('mScan').hidden) mHome();
+  if (c.dataset.view == 's2' && !sizes.length) scan();
 });
 
 // ---------- что занимает место ----------
@@ -763,11 +764,12 @@ function render() {
       c.on = !c.on; api().put('cats', S.cats.map(x => x.on)); render();
     })));
   const total = S.cats.reduce((s, c, i) => s + (c.on ? sizes[i] || 0 : 0), 0);
-  $('diskTotal').textContent = sizes.length ? t('Можно освободить ') + fmt(total) : t('Считаю…');
-  $('tShell').textContent = sizes.length ? fmt(total) : '…';
+  $('diskTotal').textContent = sizes.length && !scanning ? t('Можно освободить ') + fmt(total) : scanning ? t('Считаю…') : '';
+  $('tShell').textContent = scanning ? '…' : sizes.length ? fmt(total) : '—';
   $('dirt').style.opacity = Math.min(1, total / 2 ** 30);  // чем больше мусора, тем грязнее скорлупа; полная — от 1 ГБ
   $('diskBtn').querySelector('.label').textContent = sizes.length && total ? t('Очистить ') + fmt(total) : t('Очистить');
-  $('diskBtn').disabled = busy || !total;
+  $('diskBtn').disabled = busy || scanning || !total;
+  document.querySelector('#s2 .ibtn').disabled = busy || scanning;
   $('diskBtn').classList.toggle('accent', !!total);
 
   $('tTray').textContent = S.agent ? t('работает в фоне') : t('фон выключен');
@@ -806,7 +808,7 @@ async function poll() {
   $('autoLast').textContent = a ? t('Последняя автоочистка: {0}, освобождено {1}', new Date(a.time * 1000).toLocaleString(lang), fmt(a.freed)) : '';
   $('tRam').textContent = `${m.load}%`;
   $('ramFill').setAttribute('y', 76 - 76 * m.load / 100);
-  if (!busy) status(S.applied ? t('Оптимизация включена') : t('Готово'));
+  if (!busy && !scanning) status(S.applied ? t('Оптимизация включена') : t('Готово'));
 }
 
 async function task(text, fn) {
@@ -822,7 +824,14 @@ async function task(text, fn) {
   }
 }
 
-const scan = () => task(t('Считаю мусор на диске'), async () => { sizes = await api().scan(); });
+// подсчёт идёт долго и нужен только разделу «Диск», поэтому остальные кнопки он не блокирует
+async function scan() {
+  if (busy || scanning) return;
+  scanning = true; status(t('Считаю мусор на диске'), true); render();
+  try { sizes = await api().scan(); }
+  catch (e) { status(t('Ошибка: ') + e); }
+  finally { scanning = false; render(); poll(); }
+}
 const cleanDisk = () => peelTask($('diskBtn'), t('Очищаю диск'), async () => {
   $('diskResult').textContent = t('освобождено ') + fmt(await api().clean_disk());
   sizes = await api().scan();
@@ -874,7 +883,7 @@ async function antilag() {
 window.addEventListener('pywebviewready', async () => {
   S = await api().get(); lang = S.lang; mExtKind = S.ext_kinds;
   $('vVer').textContent = S.version; translatePage();
-  render(); poll(); setInterval(poll, 2000); scan(); updCheck();
+  render(); poll(); setInterval(poll, 2000); updCheck();
 });
 </script>
 </body>

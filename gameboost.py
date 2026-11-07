@@ -768,7 +768,7 @@ def save(data):
 
 # ---------- обновление и язык ----------
 
-VERSION = "1.0.6"
+VERSION = "1.0.7"
 REPO, ASSET = "fggtf24-cyber/yaytsechist", "Yaytsechist.exe"
 TITLES = {"ru": "Яйцечист", "en": "Yaytsechist"}
 
