@@ -742,6 +742,65 @@ def tree_forget(t, path):
     return size
 
 
+def wipe(path):
+    """Удаляет навсегда всё, что получится; занятое пропускает. Ссылки и junction убирает сами по себе,
+    не заходя внутрь: иначе удалилось бы содержимое папки, на которую они указывают."""
+    def rm(p):
+        try:
+            os.chmod(p, stat.S_IWRITE)
+            os.remove(p)
+        except OSError:
+            pass
+
+    if os.path.isdir(path) and not _is_link(path):
+        for e in os.scandir(path):
+            if _is_link(e.path):
+                try:
+                    os.rmdir(e.path) if e.is_dir() else os.remove(e.path)
+                except OSError:
+                    pass
+            elif e.is_dir(follow_symlinks=False):
+                wipe(e.path)
+            else:
+                rm(e.path)
+        try:
+            os.rmdir(path)
+        except OSError:
+            pass
+    elif _is_link(path) and os.path.isdir(path):
+        os.rmdir(path)
+    else:
+        rm(path)
+    return not os.path.lexists(path)
+
+
+def tree_refresh(t, path):
+    """Пересканирует одну папку и встраивает её в дерево. Возвращает, на сколько она уменьшилась."""
+    parent = tree_node(t, os.path.dirname(path))
+    if parent is None or not any(c.name == os.path.basename(path) for c in parent.dirs):
+        return 0
+    was = tree_forget(t, path)
+    s = Scan(path)
+    tree_walk(s)
+    d = s.root
+    d.name, d.parent = os.path.basename(path), parent
+    parent.dirs.append(d)
+    for e, (size, count) in s.exts.items():
+        x = t.exts.setdefault(e, [0, 0])
+        x[0] += size
+        x[1] += count
+    t.top = heapq.nlargest(TOP_FILES, t.top + s.top)
+    heapq.heapify(t.top)
+    p = parent
+    while p:
+        p.size += d.size
+        p.count += d.count
+        for i, v in enumerate(d.kinds):
+            p.kinds[i] += v
+        p = p.parent
+    return was - d.size
+
+
 def protected(path):
     """Корень диска, Windows целиком и сами системные папки в корзину не отправляем."""
     p = os.path.normcase(os.path.abspath(path))
@@ -760,17 +819,19 @@ class ShFileOp(ctypes.Structure):
                 ("hNameMappings", ctypes.c_void_p), ("lpszProgressTitle", ctypes.c_void_p)]
 
 
-def recycle(path):
-    """В корзину. Если у диска её нет (флешка), Windows сама предупредит, что файл удалится навсегда."""
+def recycle(path, undo=True):
+    """undo — в корзину; если у диска её нет (флешка), Windows сама предупредит, что файл удалится навсегда.
+    Без undo — сразу навсегда. Занятые файлы Windows пропустит, тогда часть папки останется."""
     buf = ctypes.create_unicode_buffer(path + "\0")  # список путей заканчивается двумя нулями
-    op = ShFileOp(None, 3, ctypes.addressof(buf), None, 0x40 | 0x10 | 0x4000)  # DELETE; ALLOWUNDO, NOCONFIRMATION, WANTNUKEWARNING
+    flags = (0x40 | 0x4000 if undo else 0) | 0x10 | 0x400  # ALLOWUNDO, WANTNUKEWARNING; NOCONFIRMATION, NOERRORUI
+    op = ShFileOp(None, 3, ctypes.addressof(buf), None, flags)  # FO_DELETE
     return ctypes.windll.shell32.SHFileOperationW(byref(op)) == 0 and not op.fAnyOperationsAborted and not os.path.lexists(path)
 
 
 # ---------- состояние и окно ----------
 
 DEFAULTS = {"applied": None, "cats": [c[3] for c in CATEGORIES], "ram_mask": RAM_DEFAULT,
-            "auto_on": False, "auto_pct": 90, "int_on": False, "int_min": 30, "tray_on": False, "lang": ""}
+            "auto_on": False, "auto_pct": 90, "int_on": False, "int_min": 30, "tray_on": False, "lang": "", "ask_delete": True}
 
 
 def load(fallback=None):
@@ -793,7 +854,7 @@ def save(data):
 
 # ---------- обновление и язык ----------
 
-VERSION = "1.0.8"
+VERSION = "1.0.9"
 REPO, ASSET = "fggtf24-cyber/yaytsechist", "Yaytsechist.exe"
 TITLES = {"ru": "Яйцечист", "en": "Yaytsechist"}
 
@@ -894,7 +955,7 @@ class Api:
                 "cats": [{"name": c[0], "note": c[4], "on": on} for c, on in zip(CATEGORIES, st["cats"])],
                 "areas": [{"flag": f, "name": n, "note": t} for f, n, t in RAM_AREAS],
                 "kinds": [k[0] for k in KINDS] + ["Другое"], "ext_kinds": KIND_OF, "lang": lang_of(st), "version": VERSION,
-                "mask": st["ram_mask"], **{k: st[k] for k in ("auto_on", "auto_pct", "int_on", "int_min", "tray_on")}}
+                "mask": st["ram_mask"], **{k: st[k] for k in ("auto_on", "auto_pct", "int_on", "int_min", "tray_on", "ask_delete")}}
 
     def sysinfo(self):
         return {"timer": query_timer(), "plan": plan_name()}
@@ -1008,12 +1069,16 @@ class Api:
     def tree_reveal(self, path):
         subprocess.Popen(f'explorer /select,"{path}"')
 
-    def tree_delete(self, path):
+    def tree_delete(self, path, forever=False):
         if protected(path):
-            return {"ok": False, "error": "Это системная папка, её удалять нельзя"}
-        if not recycle(path):
-            return {"ok": False, "error": "Не получилось: файл занят или удаление отменено"}
-        return {"ok": True, "freed": tree_forget(TREE, path)}
+            return {"ok": False, "error": "Это системная папка, её удалять нельзя", "freed": 0}
+        if wipe(path) if forever else recycle(path):
+            return {"ok": True, "freed": tree_forget(TREE, path)}
+        if os.path.isdir(path):  # удалилась только часть: пересчитать папку, чтобы схема не врала
+            freed = tree_refresh(TREE, path)
+            if freed:
+                return {"ok": False, "error": "Часть файлов занята и не удалилась", "freed": freed}
+        return {"ok": False, "error": "Не получилось: файл занят или удаление отменено", "freed": 0}
 
     def tree_export(self):
         import webview
@@ -1133,6 +1198,22 @@ def selftest():
         assert tree_forget(t, os.path.join(tmp, "a", "b")) == 1000 and t.root.size == 10 and t.exts["mp4"] == [0, 0]
         assert not t.top[0][1].endswith("film.mp4") and tree_forget(t, os.path.join(tmp, "a", "note.txt")) == 10
         assert t.root.size == 0 and t.root.count == 0 and not protected(tmp)
+    with tempfile.TemporaryDirectory() as tmp:
+        os.makedirs(os.path.join(tmp, "d"))
+        Path(tmp, "d", "free.bin").write_bytes(b"x" * 300)
+        Path(tmp, "d", "busy.mp4").write_bytes(b"x" * 20)
+        t = Scan(tmp)
+        tree_walk(t)
+        with open(os.path.join(tmp, "d", "busy.mp4")):  # занят: Windows не даст удалить
+            assert not wipe(os.path.join(tmp, "d"))
+        assert not os.path.exists(os.path.join(tmp, "d", "free.bin")), "свободный файл не удалился навсегда"
+        assert tree_refresh(t, os.path.join(tmp, "d")) == 300 and t.root.size == 20 and t.exts["mp4"] == [20, 1]
+        assert wipe(os.path.join(tmp, "d")) and not os.path.exists(os.path.join(tmp, "d"))
+    with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as outside:
+        Path(outside, "precious.txt").write_text("x")
+        os.makedirs(os.path.join(tmp, "d"))
+        subprocess.run(["cmd", "/c", "mklink", "/J", os.path.join(tmp, "d", "link"), outside], capture_output=True)
+        assert wipe(os.path.join(tmp, "d")) and os.path.exists(os.path.join(outside, "precious.txt")), "удаление прошло через junction!"
     assert protected("C:\\") and protected(W) and protected(W + r"\System32\x.dll") and protected(os.environ["ProgramFiles"])
     assert tree_map(Dir("x", None), 1, 3) == [] and kind("a.MKV") == 0 and kind("нет расширения") == len(KINDS)
     assert ver("v1.10.0") > ver("1.9.9") and not ver("1.0.0") > ver(VERSION) and lang_of({"lang": "en"}) == "en"
