@@ -447,7 +447,7 @@ section:not([hidden]){animation:page .22s cubic-bezier(.2,.7,.3,1)}
 <script>
 const $ = id => document.getElementById(id);
 const api = () => window.pywebview.api;
-const EN = { "Яйцечист": "Yaytsechist", "Разделы": "Sections", "Оптимизация": "Optimization", "Диск": "Disk", "Место на диске": "Disk usage", "Память": "Memory", "Настройки": "Settings", "Загрузка": "Loading", "не проверено": "not scanned", "проверяю…": "scanning…", "Оптимизация для игр": "Game optimization", "Таймер Windows": "Windows timer", "План питания": "Power plan", "Работа в фоне": "Background mode", "Включить оптимизацию": "Turn on optimization", "Выключить и вернуть как было": "Turn off and restore settings", "Работает. Окно можно закрыть — программа останется в трее.": "Running. You can close the window, the app stays in the tray.", "План питания, таймер 0.5 мс, без Game DVR. Всё возвращается одной кнопкой.": "Power plan, 0.5 ms timer, no Game DVR. One button restores everything.", "включена": "on", "выключена": "off", "выключено": "off", "работает": "running", " мс": " ms", "обычно 15.6": "usually 15.6", "Очистка диска": "Disk cleanup", "Считаю…": "Counting…", "Пересчитать": "Recount", "Очистить": "Clean", "Очистить ": "Clean ", "Файлы, занятые программами, пропускаются": "Files in use are skipped", "Можно освободить ": "You can free ", "Временные файлы": "Temporary files", "старше суток": "older than a day", "Temp Windows": "Windows Temp", "Windows Update": "Windows Update", "кэш загрузок": "download cache", "Отчёты об ошибках": "Error reports", "и дампы": "and dumps", "Браузеры": "Browsers", "закройте их": "close them first", "Steam / Epic / Discord": "Steam / Epic / Discord", "веб-кэш": "web cache", "Кэш шейдеров": "Shader cache", "только если игры глючат": "only if games glitch", "Корзина": "Recycle Bin", "Кэш After Effects": "After Effects cache", "закройте Adobe": "close Adobe apps first", "навсегда": "permanent", "Очистка памяти": "Memory cleanup", "Очистить память": "Clean memory", "Загрузка оперативной памяти": "Memory load", "Что именно чистить": "What to clean", "Что чистить: {0} из {1}": "What to clean: {0} of {1}", "Занято {0} из {1}": "Used {0} of {1}", "Чистить, когда память занята больше чем": "Clean when memory use is above", "Чистить по расписанию, каждые": "Clean on a schedule, every", " мин": " min", "Порог": "Threshold", "Интервал": "Interval", " меньше": " down", " больше": " up", "Память запущенных программ": "Memory of running apps", "рабочие наборы": "working sets", "Файловый кэш системы": "System file cache", "безопасно": "safe", "Записать кэш файлов на диск": "Write file cache to disk", "Изменённые страницы": "Modified pages", "может подвисать": "may stutter", "Резервная память (standby)": "Standby memory", "Резервная память, низкий приоритет": "Standby memory, low priority", "Кэш реестра": "Registry cache", "Windows 8.1+": "Windows 8.1+", "Объединение одинаковых страниц": "Combine identical pages", "Windows 10+": "Windows 10+", "Что занимает место": "What takes up space", "Другой диск": "Another drive", "Обновить": "Update", "Обновить скан": "Rescan", "В таблицу CSV": "Export to CSV", "Выбрать папку…": "Choose a folder…", "0 файлов": "0 files", "Остановить": "Stop", "Папки": "Folders", "Файлы": "Files", "Типы": "Types", "Найти файл или папку": "Find a file or folder", "Поиск по имени": "Search by name", "Схема: размер прямоугольника — сколько места занимает файл или папка": "Map: the size of a rectangle shows how much space a file or folder takes", "Выбери файл или папку": "Select a file or folder", "Показать в папке": "Show in folder", "Последняя автоочистка: {0}, освобождено {1}": "Last automatic cleanup: {0}, freed {1}", "В корзину": "Move to Recycle Bin", "свободно {0} из {1}": "{0} free of {1}", "{0} в {1}": "{0} in {1}", "свободно {0}": "{0} free", "ещё {0} закрыто от сканера": "{0} more is closed to the scanner", "Недоступных файлов и папок: ": "Inaccessible files and folders: ", "и ещё {0} поменьше": "and {0} smaller items", "Имя": "Name", "Доля": "Share", "Размер": "Size", "Файлов": "Files", "Изменён": "Modified", "Самые большие файлы": "Largest files", "Тип": "Type", "Расширение": "Extension", "без расширения": "no extension", "Показать такие файлы": "Show these files", "Мелкие файлы: ": "Small files: ", "Видео": "Video", "Музыка": "Music", "Картинки": "Images", "Архивы и образы": "Archives and disk images", "Программы": "Programs", "Документы": "Documents", "Другое": "Other", "В корзину?": "Move to Recycle Bin?", "Удалить": "Delete", "Развернуть": "Expand", "Предыдущая версия Windows": "Previous Windows installation", "откат станет невозможен": "rollback will no longer be possible", "Остатки обновлений Windows": "Windows Update leftovers", "долго, до 15 минут": "slow, up to 15 minutes", " и ещё остатки обновлений": " plus update leftovers", "Больше не спрашивать": "Don't ask again", "Спрашивать перед удалением файлов": "Ask before deleting files", "Не получилось": "Failed", "Удалить навсегда": "Delete permanently", "Удалить навсегда?": "Delete permanently?", "Файлы не попадут в корзину, вернуть их будет нельзя.": "Files will not go to the Recycle Bin and cannot be restored.", "Удалено навсегда: ": "Permanently deleted: ", "Часть файлов занята и не удалилась": "Some files are in use and were not deleted", "Отмена": "Cancel", "Закрыть": "Close", "В корзину отправлено ": "Moved to Recycle Bin: ", "Сохранено: ": "Saved: ", "Это системная папка, её удалять нельзя": "This is a system folder and cannot be deleted", "Не получилось: файл занят или удаление отменено": "Failed: the file is in use or deletion was cancelled", "В фоне работают значок в трее и автоочистка памяти, даже когда окно закрыто.": "The tray icon and automatic memory cleanup keep working when the window is closed.", "Держать в трее и запускать вместе с Windows": "Keep in tray and start with Windows", "работает в фоне": "running in background", "фон выключен": "background off", "Язык": "Language", "Русский": "Русский", "Версия": "Version", "Проверить обновления": "Check for updates", "Позже": "Later", "Вышла версия {0}": "Version {0} is out", "Скачиваю обновление…": "Downloading update…", "Не вышло обновиться. Попробуй позже.": "Update failed. Try again later.", "Установлена последняя версия": "You have the latest version", "Не удалось проверить обновления": "Could not check for updates", "Оптимизация включена": "Optimization is on", "Готово": "Ready", "Ошибка: ": "Error: ", "Считаю мусор на диске": "Counting junk on disk", "Очищаю диск": "Cleaning disk", "Очищаю память": "Cleaning memory", "освобождено ": "freed ", "ждёт": "waiting", "Включение": "Turning on", "Выключение": "Turning off", "Настраиваю систему и чищу компьютер. Это займёт до минуты.": "Setting up the system and cleaning the PC. This takes up to a minute.", "Возвращаю все настройки, как было до включения.": "Restoring all settings to how they were.", "План питания как в AntiLag": "AntiLag power plan", "Таймеры, видеокарта, Game DVR": "Timers, GPU, Game DVR", "Работа в фоне и значок в трее": "Background mode and tray icon", "Кэш NVIDIA": "NVIDIA cache", "Прежний план питания": "Previous power plan", "Фоновый режим": "Background mode", "Включаю оптимизацию": "Turning on optimization", "Возвращаю настройки": "Restoring settings", "готово": "done", "ошибка": "error", "идёт…": "running…", "Перезагрузить?": "Restart now?", "Часть настроек (таймеры и реестр) заработает только после перезагрузки.": "Some settings (timers and registry) only apply after a restart.", "Перезагрузить": "Restart", "Перезагрузка через 5 секунд…": "Restarting in 5 seconds…", "Б": "B", "КБ": "KB", "МБ": "MB", "ГБ": "GB", "ТБ": "TB" };
+const EN = { "Яйцечист": "Yaytsechist", "Разделы": "Sections", "Оптимизация": "Optimization", "Диск": "Disk", "Место на диске": "Disk usage", "Память": "Memory", "Настройки": "Settings", "Загрузка": "Loading", "не проверено": "not scanned", "проверяю…": "scanning…", "Оптимизация для игр": "Game optimization", "Таймер Windows": "Windows timer", "План питания": "Power plan", "Работа в фоне": "Background mode", "Включить оптимизацию": "Turn on optimization", "Выключить и вернуть как было": "Turn off and restore settings", "Работает. Окно можно закрыть — программа останется в трее.": "Running. You can close the window, the app stays in the tray.", "План питания, таймер 0.5 мс, без Game DVR. Всё возвращается одной кнопкой.": "Power plan, 0.5 ms timer, no Game DVR. One button restores everything.", "включена": "on", "выключена": "off", "выключено": "off", "работает": "running", " мс": " ms", "обычно 15.6": "usually 15.6", "Очистка диска": "Disk cleanup", "Считаю…": "Counting…", "Пересчитать": "Recount", "Очистить": "Clean", "Очистить ": "Clean ", "Файлы, занятые программами, пропускаются": "Files in use are skipped", "Можно освободить ": "You can free ", "Временные файлы": "Temporary files", "старше суток": "older than a day", "Temp Windows": "Windows Temp", "Windows Update": "Windows Update", "кэш загрузок": "download cache", "Отчёты об ошибках": "Error reports", "и дампы": "and dumps", "Браузеры": "Browsers", "закройте их": "close them first", "Steam / Epic / Discord": "Steam / Epic / Discord", "веб-кэш": "web cache", "Кэш шейдеров": "Shader cache", "только если игры глючат": "only if games glitch", "Корзина": "Recycle Bin", "Кэш After Effects": "After Effects cache", "закройте Adobe": "close Adobe apps first", "навсегда": "permanent", "Очистка памяти": "Memory cleanup", "Очистить память": "Clean memory", "Загрузка оперативной памяти": "Memory load", "Что именно чистить": "What to clean", "Что чистить: {0} из {1}": "What to clean: {0} of {1}", "Занято {0} из {1}": "Used {0} of {1}", "Чистить, когда память занята больше чем": "Clean when memory use is above", "Чистить по расписанию, каждые": "Clean on a schedule, every", " мин": " min", "Порог": "Threshold", "Интервал": "Interval", " меньше": " down", " больше": " up", "Память запущенных программ": "Memory of running apps", "рабочие наборы": "working sets", "Файловый кэш системы": "System file cache", "безопасно": "safe", "Записать кэш файлов на диск": "Write file cache to disk", "Изменённые страницы": "Modified pages", "может подвисать": "may stutter", "Резервная память (standby)": "Standby memory", "Резервная память, низкий приоритет": "Standby memory, low priority", "Кэш реестра": "Registry cache", "Windows 8.1+": "Windows 8.1+", "Объединение одинаковых страниц": "Combine identical pages", "Windows 10+": "Windows 10+", "Что занимает место": "What takes up space", "Другой диск": "Another drive", "Обновить": "Update", "Обновить скан": "Rescan", "В таблицу CSV": "Export to CSV", "Выбрать папку…": "Choose a folder…", "0 файлов": "0 files", "Остановить": "Stop", "Папки": "Folders", "Файлы": "Files", "Типы": "Types", "Найти файл или папку": "Find a file or folder", "Поиск по имени": "Search by name", "Схема: размер прямоугольника — сколько места занимает файл или папка": "Map: the size of a rectangle shows how much space a file or folder takes", "Выбери файл или папку": "Select a file or folder", "Показать в папке": "Show in folder", "Последняя автоочистка: {0}, освобождено {1}": "Last automatic cleanup: {0}, freed {1}", "В корзину": "Move to Recycle Bin", "свободно {0} из {1}": "{0} free of {1}", "{0} в {1}": "{0} in {1}", "свободно {0}": "{0} free", "ещё {0} закрыто от сканера": "{0} more is closed to the scanner", "Недоступных файлов и папок: ": "Inaccessible files and folders: ", "и ещё {0} поменьше": "and {0} smaller items", "Имя": "Name", "Доля": "Share", "Размер": "Size", "Файлов": "Files", "Изменён": "Modified", "Самые большие файлы": "Largest files", "Тип": "Type", "Расширение": "Extension", "без расширения": "no extension", "Показать такие файлы": "Show these files", "Мелкие файлы: ": "Small files: ", "Видео": "Video", "Музыка": "Music", "Картинки": "Images", "Архивы и образы": "Archives and disk images", "Программы": "Programs", "Документы": "Documents", "Другое": "Other", "В корзину?": "Move to Recycle Bin?", "Удалить": "Delete", "Выбрано: {0}": "Selected: {0}", "Развернуть": "Expand", "Предыдущая версия Windows": "Previous Windows installation", "откат станет невозможен": "rollback will no longer be possible", "Остатки обновлений Windows": "Windows Update leftovers", "долго, до 15 минут": "slow, up to 15 minutes", " и ещё остатки обновлений": " plus update leftovers", "Больше не спрашивать": "Don't ask again", "Спрашивать перед удалением файлов": "Ask before deleting files", "Не получилось": "Failed", "Удалить навсегда": "Delete permanently", "Удалить навсегда?": "Delete permanently?", "Файлы не попадут в корзину, вернуть их будет нельзя.": "Files will not go to the Recycle Bin and cannot be restored.", "Удалено навсегда: ": "Permanently deleted: ", "Часть файлов занята и не удалилась": "Some files are in use and were not deleted", "Отмена": "Cancel", "Закрыть": "Close", "В корзину отправлено ": "Moved to Recycle Bin: ", "Сохранено: ": "Saved: ", "Это системная папка, её удалять нельзя": "This is a system folder and cannot be deleted", "Не получилось: файл занят или удаление отменено": "Failed: the file is in use or deletion was cancelled", "В фоне работают значок в трее и автоочистка памяти, даже когда окно закрыто.": "The tray icon and automatic memory cleanup keep working when the window is closed.", "Держать в трее и запускать вместе с Windows": "Keep in tray and start with Windows", "работает в фоне": "running in background", "фон выключен": "background off", "Язык": "Language", "Русский": "Русский", "Версия": "Version", "Проверить обновления": "Check for updates", "Позже": "Later", "Вышла версия {0}": "Version {0} is out", "Скачиваю обновление…": "Downloading update…", "Не вышло обновиться. Попробуй позже.": "Update failed. Try again later.", "Установлена последняя версия": "You have the latest version", "Не удалось проверить обновления": "Could not check for updates", "Оптимизация включена": "Optimization is on", "Готово": "Ready", "Ошибка: ": "Error: ", "Считаю мусор на диске": "Counting junk on disk", "Очищаю диск": "Cleaning disk", "Очищаю память": "Cleaning memory", "освобождено ": "freed ", "ждёт": "waiting", "Включение": "Turning on", "Выключение": "Turning off", "Настраиваю систему и чищу компьютер. Это займёт до минуты.": "Setting up the system and cleaning the PC. This takes up to a minute.", "Возвращаю все настройки, как было до включения.": "Restoring all settings to how they were.", "План питания как в AntiLag": "AntiLag power plan", "Таймеры, видеокарта, Game DVR": "Timers, GPU, Game DVR", "Работа в фоне и значок в трее": "Background mode and tray icon", "Кэш NVIDIA": "NVIDIA cache", "Прежний план питания": "Previous power plan", "Фоновый режим": "Background mode", "Включаю оптимизацию": "Turning on optimization", "Возвращаю настройки": "Restoring settings", "готово": "done", "ошибка": "error", "идёт…": "running…", "Перезагрузить?": "Restart now?", "Часть настроек (таймеры и реестр) заработает только после перезагрузки.": "Some settings (timers and registry) only apply after a restart.", "Перезагрузить": "Restart", "Перезагрузка через 5 секунд…": "Restarting in 5 seconds…", "Б": "B", "КБ": "KB", "МБ": "MB", "ГБ": "GB", "ТБ": "TB" };
 let lang = 'ru';
 // русский текст — он же ключ перевода; {0} {1} — подстановки
 function t(ru, ...args) {
@@ -681,7 +681,7 @@ function mRow(name, path, isDir, size, whole, count, mtime, depth = -1) {
   nm.append(fileIcon(isDir, path));
   nm.append(el('span', 'nmt', name));
   r.append(nm, bar, el('span', 'num sz', fmt(size)), el('span', 'num', count), el('span', 'num', day(mtime)));
-  r.onclick = () => mSelect(path);
+  r.onclick = e => mSelect(path, e.ctrlKey ? 'toggle' : e.shiftKey ? 'range' : undefined);
   if (isDir) {
     r.ondblclick = () => mOpen(path);
     r.onkeydown = e => {
@@ -771,26 +771,47 @@ function mLegend() {
   $('mLegend').replaceChildren(...items.map(([n, c]) => { const s = el('span'), i = el('i'); i.style.background = c; s.append(i, t(n)); return s; }));
 }
 
-function mSelect(path) {
-  mSelected = path;
-  $('mSel').textContent = path || t('Выбери файл или папку'); $('mSel').title = path || '';
-  $('mShow').disabled = $('mDel').disabled = $('mKill').disabled = !path;
-  document.querySelectorAll('#mList .mrow[data-path]').forEach(r => r.setAttribute('aria-selected', r.dataset.path == path));
+// выбор как в Проводнике: клик — один, Ctrl — добавить или снять, Shift — в списке подряд, на схеме добавить
+let mPicked = [];
+function mSelect(path, mode) {
+  const rows = [...document.querySelectorAll('#mList [data-path]')].map(r => r.dataset.path);
+  if (!path) mPicked = [];
+  else if (mode == 'toggle') mPicked = mPicked.includes(path) ? mPicked.filter(p => p != path) : [...mPicked, path];
+  else if (mode == 'range' && rows.includes(mSelected) && rows.includes(path)) {
+    const [a, b] = [rows.indexOf(mSelected), rows.indexOf(path)].sort((x, y) => x - y);
+    mPicked = [...new Set([...mPicked, ...rows.slice(a, b + 1)])];
+  } else mPicked = [path];
+  if (mode != 'range') mSelected = mPicked.includes(path) ? path : mPicked.at(-1) ?? null;  // от неё Shift отсчитывает диапазон
+  const n = mPicked.length;
+  $('mSel').textContent = n > 1 ? t('Выбрано: {0}', n) : n ? mPicked[0] : t('Выбери файл или папку');
+  $('mSel').title = mPicked.join('\n');
+  $('mShow').disabled = $('mDel').disabled = $('mKill').disabled = !n;
+  document.querySelectorAll('#mList .mrow[data-path]').forEach(r => r.setAttribute('aria-selected', mPicked.includes(r.dataset.path)));
   mPaint();
 }
-async function mRemove(path, forever) {
-  const r = await api().tree_delete(path, forever);
-  if (r.freed) { mInfo = await api().tree_info(); mSelect(null); await mRefresh(); }  // в том числе когда удалилась только часть
-  if (r.ok) status((forever ? t('Удалено навсегда: ') : t('В корзину отправлено ')) + fmt(r.freed));
-  return r;
+// если выбрана папка и что-то внутри неё, внутреннее удалится вместе с папкой
+const mTopPicked = () => mPicked.filter(p => !mPicked.some(q => q != p && p.startsWith(q + SEP)));
+async function mRemove(paths, forever) {
+  let freed = 0;
+  const fails = [];
+  for (const p of paths) {
+    const r = await api().tree_delete(p, forever);
+    freed += r.freed || 0;
+    if (!r.ok) fails.push(r);
+  }
+  if (freed) { mInfo = await api().tree_info(); mSelect(null); await mRefresh(); }  // в том числе когда удалилась только часть
+  if (!fails.length) status((forever ? t('Удалено навсегда: ') : t('В корзину отправлено ')) + fmt(freed));
+  return { ok: !fails.length, freed, error: fails.length && fails[0].error };
 }
 function mFailed(r) {
   return t(r.error) + (r.freed ? ' · ' + fmt(r.freed) : '');
 }
 async function mDelete(forever = false) {
-  const path = mSelected;
+  const paths = mTopPicked();
+  if (!paths.length) return;
+  const what = paths.length == 1 ? paths[0] : t('Выбрано: {0}', paths.length) + ' — ' + paths.slice(0, 3).map(p => p.split(SEP).pop()).join(', ') + (paths.length > 3 ? '…' : '');
   if (!S.ask_delete) {
-    const r = await mRemove(path, forever);
+    const r = await mRemove(paths, forever);
     if (r.ok) return;
     modal(t('Не получилось'), mFailed(r), []);
     const close = el('button', 'act wide', t('Закрыть'));
@@ -798,7 +819,7 @@ async function mDelete(forever = false) {
     $('mBtns').replaceChildren(close);
     return close.focus();
   }
-  modal(forever ? t('Удалить навсегда?') : t('В корзину?'), forever ? path + ' — ' + t('Файлы не попадут в корзину, вернуть их будет нельзя.') : path, []);
+  modal(forever ? t('Удалить навсегда?') : t('В корзину?'), forever ? what + ' — ' + t('Файлы не попадут в корзину, вернуть их будет нельзя.') : what, []);
   const skip = el('button', 'row off'), box = el('i', 'sq');
   skip.setAttribute('role', 'checkbox'); skip.setAttribute('aria-checked', false);
   skip.append(box, el('span', 'name', t('Больше не спрашивать')));
@@ -809,7 +830,7 @@ async function mDelete(forever = false) {
   yes.onclick = async () => {
     yes.disabled = no.disabled = true;
     if (skip.getAttribute('aria-checked') == 'true') { S.ask_delete = false; api().put('ask_delete', false); render(); }
-    const r = await mRemove(path, forever);
+    const r = await mRemove(paths, forever);
     if (!r.ok) { $('mText').textContent = mFailed(r); no.disabled = false; no.textContent = t('Закрыть'); return; }
     $('modal').hidden = true;
   };
@@ -898,7 +919,7 @@ function mPaint() {
   g.drawImage(mPaper, 0, 0);
   g.scale(dpr, dpr);
   const ring = (l, color) => { g.strokeStyle = color; g.lineWidth = 2; g.strokeRect(l.x + 1, l.y + 1, Math.max(l.w - 2, 1), Math.max(l.h - 2, 1)); };
-  if (mSelected) for (const l of mLeaves) if (l.path == mSelected || l.path.startsWith(mSelected + SEP)) ring(l, '#F2C14E');
+  for (const p of mPicked) for (const l of mLeaves) if (l.path == p || l.path.startsWith(p + SEP)) ring(l, '#F2C14E');
   if (mHover) ring(mHover, '#FAF9F5');
 }
 function mHit(e) {
@@ -915,14 +936,14 @@ $('mMap').onmousemove = e => {
   tip.style.top = Math.min(e.clientY + 14, innerHeight - tip.offsetHeight - 8) + 'px';
 };
 $('mMap').onmouseleave = () => { mHover = null; $('mTip').hidden = true; mPaint(); };
-$('mMap').onclick = e => { const l = mHit(e); if (l) mSelect(l.path); };
+$('mMap').onclick = e => { const l = mHit(e); if (l) mSelect(l.path, e.ctrlKey || e.shiftKey ? 'toggle' : undefined); };
 $('mMap').ondblclick = e => { const l = mHit(e); if (l && l.up && mTab == 'dirs') mOpen(l.up); };
 new ResizeObserver(() => { if (mInfo) mDraw(); }).observe($('mMapBox'));
 document.querySelectorAll('#mTabs button').forEach(b => b.onclick = () => { mTab = b.dataset.tab; mSelect(null); mRefresh(); });
 let mQueryTimer = 0;
 function mMenu(e, path) {
   e.preventDefault();
-  mSelect(path);
+  if (!mPicked.includes(path)) mSelect(path);  // по выбранному — меню для всего выбранного
   const m = $('mCtx');
   m.hidden = false;
   m.style.left = Math.min(e.clientX, innerWidth - m.offsetWidth - 8) + 'px';
@@ -936,7 +957,7 @@ document.addEventListener('click', () => $('mCtx').hidden = true);
 document.addEventListener('keydown', e => { if (e.key == 'Escape') $('mCtx').hidden = true; });
 // как в Проводнике: Delete — в корзину, Shift+Delete — навсегда
 document.addEventListener('keydown', e => {
-  if (e.key != 'Delete' || !mSelected || $('s5').hidden || !$('modal').hidden || e.target.closest?.('input')) return;
+  if (e.key != 'Delete' || !mPicked.length || $('s5').hidden || !$('modal').hidden || e.target.closest?.('input')) return;
   e.preventDefault();
   $('mCtx').hidden = true;
   mDelete(e.shiftKey);

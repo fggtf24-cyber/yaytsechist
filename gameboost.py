@@ -893,7 +893,7 @@ def save(data):
 
 # ---------- обновление и язык ----------
 
-VERSION = "1.1.1"
+VERSION = "1.1.2"
 REPO, ASSET = "fggtf24-cyber/yaytsechist", "Yaytsechist.exe"
 TITLES = {"ru": "Яйцечист", "en": "Yaytsechist"}
 
