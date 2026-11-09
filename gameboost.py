@@ -475,7 +475,34 @@ def ae_cache():
 
 
 if ae := ae_cache():
-    CATEGORIES.append(("Кэш After Effects", ae, 0, False, "закройте Adobe"))  # в конце: state.json хранит галочки по порядку
+    CATEGORIES.append(("Кэш After Effects", ae, 0, False, "закройте Adobe"))
+
+SYSTEM_DRIVE = os.environ.get("SystemDrive", "C:") + "\\"
+
+
+def clean_winold(cat):
+    """Windows.old принадлежит системе: сначала права группе «Администраторы», потом удаление.
+    icacls /setowner, а не takeown /D Y: у takeown ответ «Y» зависит от языка Windows."""
+    before = scan(cat)
+    for d in (p for p in cat[1] if os.path.isdir(p)):
+        run("icacls", d, "/setowner", "*S-1-5-32-544", "/T", "/C", "/Q")
+        run("icacls", d, "/grant", "*S-1-5-32-544:F", "/T", "/C", "/Q")
+        run("cmd", "/c", "rd", "/s", "/q", d)  # rd не заходит в junction, удаляет только их самих
+    return max(0, before - scan(cat))
+
+
+def clean_winsxs(cat):
+    """Старые версии компонентов в WinSxS. Вручную там удалять нельзя, только DISM; размер известен лишь после."""
+    free = shutil.disk_usage(SYSTEM_DRIVE).free
+    run("dism", "/Online", "/Cleanup-Image", "/StartComponentCleanup")
+    return max(0, shutil.disk_usage(SYSTEM_DRIVE).free - free)
+
+
+CATEGORIES += [
+    ("Предыдущая версия Windows", [SYSTEM_DRIVE + n for n in ("Windows.old", "$Windows.~BT", "$Windows.~WS")], 0, False,
+     "откат станет невозможен", clean_winold),
+    ("Остатки обновлений Windows", "dism", 0, False, "долго, до 15 минут", clean_winsxs),
+]
 
 
 class RBInfo(ctypes.Structure):
@@ -509,6 +536,8 @@ def _old_files(cat):
 
 
 def scan(cat):
+    if isinstance(cat[1], str):
+        return -1  # размер заранее не узнать
     if cat[1] is None:
         i = RBInfo(sizeof(RBInfo))
         ctypes.windll.shell32.SHQueryRecycleBinW(None, byref(i))
@@ -518,6 +547,8 @@ def scan(cat):
 
 def clean(cat):
     """Удаляет файлы; занятые программами пропускает. Возвращает освобождённые байты."""
+    if len(cat) > 5:
+        return cat[5](cat)
     if cat[1] is None:
         size = scan(cat)
         ctypes.windll.shell32.SHEmptyRecycleBinW(None, None, 7)  # без подтверждения/звука
@@ -830,14 +861,22 @@ def recycle(path, undo=True):
 
 # ---------- состояние и окно ----------
 
-DEFAULTS = {"applied": None, "cats": [c[3] for c in CATEGORIES], "ram_mask": RAM_DEFAULT,
+OLD_ORDER = [c[0] for c in CATEGORIES[:8]] + ["Кэш After Effects"]
+
+
+def migrate_cats(cats):
+    """До 1.1 галочки хранились списком по порядку пунктов: новый пункт сдвинул бы чужие галочки."""
+    return dict(zip(OLD_ORDER, cats)) if isinstance(cats, list) else cats
+
+
+DEFAULTS = {"applied": None, "cats": {c[0]: c[3] for c in CATEGORIES}, "ram_mask": RAM_DEFAULT,
             "auto_on": False, "auto_pct": 90, "int_on": False, "int_min": 30, "tray_on": False, "lang": "", "ask_delete": True}
 
 
 def load(fallback=None):
     try:
         st = {**DEFAULTS, **json.loads(STATE.read_text("utf-8-sig"))}  # -sig: файл мог сохранить блокнот
-        st["cats"] += DEFAULTS["cats"][len(st["cats"]):]  # появились новые пункты очистки
+        st["cats"] = migrate_cats(st["cats"])
         return st
     except FileNotFoundError:
         return dict(DEFAULTS)
@@ -854,7 +893,7 @@ def save(data):
 
 # ---------- обновление и язык ----------
 
-VERSION = "1.0.9"
+VERSION = "1.1.0"
 REPO, ASSET = "fggtf24-cyber/yaytsechist", "Yaytsechist.exe"
 TITLES = {"ru": "Яйцечист", "en": "Yaytsechist"}
 
@@ -952,7 +991,7 @@ class Api:
     def get(self):
         st = load()
         return {**self.sysinfo(), "applied": bool(st["applied"]), "agent": agent_alive(),
-                "cats": [{"name": c[0], "note": c[4], "on": on} for c, on in zip(CATEGORIES, st["cats"])],
+                "cats": [{"name": c[0], "note": c[4], "on": st["cats"].get(c[0], c[3])} for c in CATEGORIES],
                 "areas": [{"flag": f, "name": n, "note": t} for f, n, t in RAM_AREAS],
                 "kinds": [k[0] for k in KINDS] + ["Другое"], "ext_kinds": KIND_OF, "lang": lang_of(st), "version": VERSION,
                 "mask": st["ram_mask"], **{k: st[k] for k in ("auto_on", "auto_pct", "int_on", "int_min", "tray_on", "ask_delete")}}
@@ -989,7 +1028,8 @@ class Api:
         return [scan(c) for c in CATEGORIES]
 
     def clean_disk(self):
-        return sum(clean(c) for c, on in zip(CATEGORIES, load()["cats"]) if on)
+        cats = load()["cats"]
+        return sum(clean(c) for c in CATEGORIES if cats.get(c[0], c[3]))
 
     def clean_ram(self):
         return clean_ram(load()["ram_mask"])
@@ -1132,14 +1172,14 @@ def gui(check=False):
             u32.SetForegroundWindow(h)
         return
     w = webview.create_window(TITLES[lang_of(load())], str(ASSETS / "ui.html"), js_api=Api(),
-                              width=1120, height=720, min_size=(900, 600), background_color="#262624")
+                              width=1120, height=720, min_size=(900, 600), background_color="#191919")
 
     def titlebar():
         """Заголовок в цвет левой панели. Цвета — 0xBBGGRR, работает с Windows 11; на Windows 10 остаётся системный."""
         w.events.shown.wait(10)
         h = find_window()
         # тёмные значки кнопок, рамка, фон заголовка, текст заголовка
-        for attr, value in ((20, 1), (34, 0x1D1E1F), (35, 0x1D1E1F), (36, 0xF5F9FA)):
+        for attr, value in ((20, 1), (34, 0x202020), (35, 0x202020), (36, 0xD4D4D4)):
             ctypes.windll.dwmapi.DwmSetWindowAttribute(h, attr, byref(ctypes.c_int(value)), 4)
 
     def probe():
@@ -1256,6 +1296,17 @@ def selftest():
         lnk = os.path.join(tmp, "Яйцечист.lnk")
         make_shortcut(lnk, r"C:\Windows\notepad.exe")
         assert os.path.exists(lnk), "ярлык с русским именем не создался"
+    old = migrate_cats([True] * 8 + [False])
+    assert old["Корзина"] and old["Кэш After Effects"] is False and "Предыдущая версия Windows" not in old
+    assert migrate_cats({"Корзина": False}) == {"Корзина": False} and scan(CATEGORIES[-1]) == -1
+    with tempfile.TemporaryDirectory() as tmp:
+        d = os.path.join(tmp, "Windows.old")
+        os.makedirs(os.path.join(d, "sub"))
+        Path(d, "sub", "a.dll").write_bytes(b"x" * 90)
+        os.utime(os.path.join(d, "sub", "a.dll"), (time.time() - 60,) * 2)  # time.time() грубее файловых часов
+        os.chmod(os.path.join(d, "sub", "a.dll"), stat.S_IREAD)  # только чтение, как многое в Windows.old
+        Path(tmp, "keep.txt").write_text("x")
+        assert clean(("w", [d], 0, False, "", clean_winold)) == 90 and not os.path.exists(d) and os.path.exists(os.path.join(tmp, "keep.txt"))
     assert human(1536) == "2 КБ" and human(5 * 1024 ** 3) == "5.0 ГБ"
     bcd = "identifier              {current}\nuseplatformtick         Yes\ndisabledynamictick      Да\nnx  OptIn\n"
     assert parse_bcd(bcd) == {"useplatformtick": "yes", "disabledynamictick": "yes"}, parse_bcd(bcd)
@@ -1286,6 +1337,6 @@ if __name__ == "__main__":
     elif not {"--window", "--updated"} & set(sys.argv) and agent_alive():
         wake_agent()
     elif not ctypes.windll.shell32.IsUserAnAdmin():
-        ctypes.windll.shell32.ShellExecuteW(None, "runas", EXE, SCRIPT, None, 1)
+        ctypes.windll.shell32.ShellExecuteW(None, "runas", EXE, SCRIPT + " ".join(sys.argv[1:]), None, 1)  # флаги вроде --window не теряются
     else:
         gui()

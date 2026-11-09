@@ -129,6 +129,11 @@ section.wide{max-width:none;padding:30px 36px 24px}
 .mhead .num{font:12px var(--sans)}
 #mAct{display:flex;align-items:center;gap:18px;margin-top:10px;min-height:32px;flex:none}
 #mAct .path{flex:1;min-width:0}
+.caret{display:grid;place-items:center;width:18px;height:18px;margin:0 4px 0 -2px;border-radius:4px;flex:none}
+.caret::before{content:"";border-left:6px solid var(--muted);border-top:4px solid transparent;border-bottom:4px solid transparent;transition:transform .15s}
+.caret[aria-expanded=true]::before{transform:rotate(90deg)}
+.caret:not(.none):hover{background:var(--pressed)}
+.caret.none::before{content:none}
 #mCtx{position:fixed;z-index:6;display:grid;min-width:190px;padding:5px;border-radius:12px;background:var(--deep);box-shadow:0 4px 18px rgba(0,0,0,.45)}
 #mCtx button{padding:8px 12px;border-radius:8px;text-align:left;font-size:14px}
 #mCtx button:hover,#mCtx button:focus-visible{background:var(--card);outline:0}
@@ -192,6 +197,121 @@ summary:hover{color:var(--ink)}
 .sheet li{display:grid;grid-template-columns:1fr auto;align-items:center;gap:10px;min-height:36px;font-size:15px}
 .sheet li .n{display:none}
 .sheet .actions{margin-top:0}
+/* ---------- вид как в Notion (тёмная тема); яйца, их цвета и анимация чистки остаются ---------- */
+:root{--bg:#191919;--deep:#202020;--card:#2A2A2A;--line:#2F2F2F;--ink:#D4D4D4;--muted:#9B9B9B;
+  --accent:#2383E2;--accentHi:#3592EA;--onAccent:#FFFFFF;--hover:rgba(255,255,255,.055);--pressed:rgba(255,255,255,.08);
+  --pop:#252525;--shadow:0 0 0 1px rgba(255,255,255,.07),0 8px 28px rgba(0,0,0,.55);
+  --sans:"Segoe UI Variable Text","Segoe UI",'Inter Tight',sans-serif;--serif:var(--sans);--mono:var(--sans);
+  --code:"Cascadia Mono",Consolas,monospace}
+body{font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
+main{grid-template-columns:240px 1fr}
+.rail{padding:10px 8px 12px;box-shadow:inset -1px 0 rgba(255,255,255,.05)}
+.logo{gap:8px;padding:7px 10px;font:600 14px var(--sans);color:var(--ink)}
+.logo svg{width:16px;height:20px}
+nav{gap:1px;margin-top:12px}
+.cell{gap:10px;padding:5px 10px;border-radius:6px;transition:background .12s}
+.cell:hover{background:var(--hover)}
+.cell[aria-current=page]{background:var(--pressed)}
+.cell svg{width:18px;height:23px}
+.cell b{font:500 14px var(--sans);color:var(--muted)}
+.cell[aria-current=page] b,.cell:hover b{color:var(--ink)}
+.cell span{font:12px var(--sans);margin-top:0;color:#7F7F7F}
+.railEnd{gap:6px}
+.rail footer{margin-top:10px;font:12px var(--sans);color:#7F7F7F}
+#upd{padding:12px;border-radius:8px;background:var(--pop);box-shadow:var(--shadow);font-size:13px;animation:pop .2s ease-out}
+.updBtns .act{height:28px;padding:0 12px;font-size:13px}
+
+section{max-width:900px;padding:40px 72px 32px}
+section.wide{max-width:none;padding:28px 40px 20px}
+.pageicon{flex:none;width:max-content;margin:0 0 10px -4px;cursor:default}
+.pageicon svg{display:block;width:52px;height:66px;overflow:visible;transition:transform .35s cubic-bezier(.3,1.6,.5,1)}
+.pageicon:hover svg{transform:rotate(-8deg) translateY(-2px)}
+.wide .pageicon svg{width:34px;height:43px}
+h2{font:700 36px/1.2 var(--sans);letter-spacing:-.015em;color:#E3E3E3}
+.wide h2{font-size:28px}
+.sub{margin-top:6px;font-size:15px;color:var(--muted)}
+.body{margin-top:18px;flex:0 1 auto}  /* кнопка идёт сразу за списком, а не прибита к низу окна */
+.row{min-height:34px;padding:0 6px;border-radius:4px;font-size:15px;gap:12px;transition:background .1s}
+button.row:hover{background:var(--hover)}
+.row.info{padding:0 2px;border-bottom:1px solid var(--line);border-radius:0}
+.row.info>span:first-child{color:var(--muted)}
+.tag{font:13px var(--sans)}
+.val{font:13px var(--sans)}
+.mini{border-radius:4px;font:15px/1 var(--sans)}
+.mini:hover{background:var(--pressed)}
+.act{height:36px;padding:0 16px;border-radius:6px;background:var(--hover);box-shadow:inset 0 0 0 1px rgba(255,255,255,.094);font:500 14px var(--sans);transition:background .12s,transform .08s}
+.act:not(:disabled):hover{background:var(--pressed)}
+.act:not(:disabled):active{transform:scale(.98)}
+.act.accent{background:var(--accent);box-shadow:none;color:var(--onAccent)}
+.act.accent:not(:disabled):hover{background:var(--accentHi)}
+.peel{height:44px;padding:0 18px 0 12px;border-radius:8px}
+.eggbox{width:32px;height:50px;margin-top:-18px}
+.eggbox::after{left:4px;right:4px;height:10px;bottom:3px}
+.egg{left:3px;bottom:7px;width:26px;height:34px}
+.actions{margin-top:18px}
+.result{font:13px var(--sans)}
+.meter{height:4px;margin-top:16px;background:rgba(255,255,255,.07)}
+summary{min-height:34px;padding:0 6px;border-radius:4px;font-size:14px}
+summary:hover{background:var(--hover)}
+summary::before{content:"";width:0;height:0;background:none;border-radius:0;border-left:6px solid var(--muted);border-top:4px solid transparent;border-bottom:4px solid transparent;margin:0 8px 0 4px;transition:transform .15s}
+details[open] summary::before{content:"";transform:rotate(90deg)}
+.ibtn{border-radius:4px;width:24px;height:24px}
+.ibtn:not(:disabled):hover{background:var(--hover)}
+.link{padding:3px 7px;border-radius:4px;font-size:14px;color:var(--muted);transition:background .1s,color .1s}
+.link:not(:disabled):hover{background:var(--hover);color:var(--ink)}
+.path,#autoLast{font:12px var(--code)}
+
+#modal{background:rgba(0,0,0,.6);animation:fade .15s ease-out}
+.sheet{background:var(--pop);border-radius:10px;box-shadow:var(--shadow);padding:24px 26px;animation:pop .18s ease-out}
+.sheet h2{font:600 20px/1.3 var(--sans);color:var(--ink)}
+.sheet p{font-size:14px}
+.sheet li{font-size:14px;min-height:32px}
+.sheet .act{height:34px}
+
+/* место на диске */
+.head{min-height:32px}
+.tools{gap:4px}
+.drive{padding:0 10px;border-radius:6px;min-height:46px;transition:background .1s}
+.drive:hover{background:var(--hover)}
+.drive:hover b{color:var(--ink)}
+.drive b{font:600 15px var(--sans)}
+.drive span{font:13px var(--sans)}
+.bar{background:rgba(255,255,255,.07)}
+.big{font:700 36px var(--sans)}
+.bartop{margin-top:10px;gap:20px;box-shadow:inset 0 -1px var(--line)}
+.seg{gap:16px}
+.seg button{padding:6px 0 8px;border-radius:0;font-size:14px;transition:color .1s,box-shadow .15s}
+.seg button[aria-pressed=true]{background:none;color:var(--ink);box-shadow:inset 0 -2px var(--ink)}
+.crumbs{font:13px var(--sans)}
+.crumbs button{padding:2px 4px;border-radius:4px}
+.crumbs button:hover{background:var(--hover)}
+#mQuery{height:28px;border-radius:6px;background:var(--hover);box-shadow:inset 0 0 0 1px rgba(255,255,255,.094);font:14px var(--sans)}
+#mQuery:focus{outline:0;box-shadow:inset 0 0 0 1px var(--accent)}
+#mMapBox{margin-top:12px}
+.legend{font-size:12px}
+.mrow{min-height:30px;padding:0 8px;border-radius:4px;font-size:14px;
+  grid-template-columns:minmax(180px,520px) 110px 82px 72px 86px;justify-content:start}  /* как в таблицах Notion: в широком окне цифры не уезжают от имени */
+.mrow .nm{display:flex;align-items:center;min-width:0}
+.mrow .nmt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mrow:hover{background:var(--hover)}
+.mrow[aria-selected=true]{background:rgba(35,131,226,.22)}
+.mrow .num{font:13px var(--sans)}
+.mhead{border-radius:0;box-shadow:inset 0 -1px var(--line)}
+#mTip{background:var(--pop);border-radius:6px;box-shadow:var(--shadow)}
+#mTip span{font:12px var(--sans)}
+#mCtx{background:var(--pop);border-radius:8px;box-shadow:var(--shadow);padding:4px;animation:pop .12s ease-out;transform-origin:top left}
+#mCtx button{padding:6px 10px;border-radius:4px}
+#mCtx button:hover,#mCtx button:focus-visible{background:var(--hover)}
+
+/* анимации: только прозрачность и сдвиг, их видеокарта рисует бесплатно */
+section:not([hidden]){animation:page .22s cubic-bezier(.2,.7,.3,1)}
+@keyframes page{from{opacity:0;transform:translateY(6px)}}
+@keyframes fade{from{opacity:0}}
+@keyframes pop{from{opacity:0;transform:scale(.97) translateY(-2px)}}
+@media (prefers-reduced-motion:reduce){
+  section:not([hidden]),#modal,.sheet,#mCtx,#upd{animation:none}
+  .pageicon svg,.act{transition:none}
+}
 </style>
 </head>
 <body>
@@ -323,7 +443,7 @@ summary:hover{color:var(--ink)}
 <script>
 const $ = id => document.getElementById(id);
 const api = () => window.pywebview.api;
-const EN = { "Яйцечист": "Yaytsechist", "Разделы": "Sections", "Оптимизация": "Optimization", "Диск": "Disk", "Место на диске": "Disk usage", "Память": "Memory", "Настройки": "Settings", "Загрузка": "Loading", "не проверено": "not scanned", "проверяю…": "scanning…", "Оптимизация для игр": "Game optimization", "Таймер Windows": "Windows timer", "План питания": "Power plan", "Работа в фоне": "Background mode", "Включить оптимизацию": "Turn on optimization", "Выключить и вернуть как было": "Turn off and restore settings", "Работает. Окно можно закрыть — программа останется в трее.": "Running. You can close the window, the app stays in the tray.", "План питания, таймер 0.5 мс, без Game DVR. Всё возвращается одной кнопкой.": "Power plan, 0.5 ms timer, no Game DVR. One button restores everything.", "включена": "on", "выключена": "off", "выключено": "off", "работает": "running", " мс": " ms", "обычно 15.6": "usually 15.6", "Очистка диска": "Disk cleanup", "Считаю…": "Counting…", "Пересчитать": "Recount", "Очистить": "Clean", "Очистить ": "Clean ", "Файлы, занятые программами, пропускаются": "Files in use are skipped", "Можно освободить ": "You can free ", "Временные файлы": "Temporary files", "старше суток": "older than a day", "Temp Windows": "Windows Temp", "Windows Update": "Windows Update", "кэш загрузок": "download cache", "Отчёты об ошибках": "Error reports", "и дампы": "and dumps", "Браузеры": "Browsers", "закройте их": "close them first", "Steam / Epic / Discord": "Steam / Epic / Discord", "веб-кэш": "web cache", "Кэш шейдеров": "Shader cache", "только если игры глючат": "only if games glitch", "Корзина": "Recycle Bin", "Кэш After Effects": "After Effects cache", "закройте Adobe": "close Adobe apps first", "навсегда": "permanent", "Очистка памяти": "Memory cleanup", "Очистить память": "Clean memory", "Загрузка оперативной памяти": "Memory load", "Что именно чистить": "What to clean", "Что чистить: {0} из {1}": "What to clean: {0} of {1}", "Занято {0} из {1}": "Used {0} of {1}", "Чистить, когда память занята больше чем": "Clean when memory use is above", "Чистить по расписанию, каждые": "Clean on a schedule, every", " мин": " min", "Порог": "Threshold", "Интервал": "Interval", " меньше": " down", " больше": " up", "Память запущенных программ": "Memory of running apps", "рабочие наборы": "working sets", "Файловый кэш системы": "System file cache", "безопасно": "safe", "Записать кэш файлов на диск": "Write file cache to disk", "Изменённые страницы": "Modified pages", "может подвисать": "may stutter", "Резервная память (standby)": "Standby memory", "Резервная память, низкий приоритет": "Standby memory, low priority", "Кэш реестра": "Registry cache", "Windows 8.1+": "Windows 8.1+", "Объединение одинаковых страниц": "Combine identical pages", "Windows 10+": "Windows 10+", "Что занимает место": "What takes up space", "Другой диск": "Another drive", "Обновить": "Update", "Обновить скан": "Rescan", "В таблицу CSV": "Export to CSV", "Выбрать папку…": "Choose a folder…", "0 файлов": "0 files", "Остановить": "Stop", "Папки": "Folders", "Файлы": "Files", "Типы": "Types", "Найти файл или папку": "Find a file or folder", "Поиск по имени": "Search by name", "Схема: размер прямоугольника — сколько места занимает файл или папка": "Map: the size of a rectangle shows how much space a file or folder takes", "Выбери файл или папку": "Select a file or folder", "Показать в папке": "Show in folder", "Последняя автоочистка: {0}, освобождено {1}": "Last automatic cleanup: {0}, freed {1}", "В корзину": "Move to Recycle Bin", "свободно {0} из {1}": "{0} free of {1}", "{0} в {1}": "{0} in {1}", "свободно {0}": "{0} free", "ещё {0} закрыто от сканера": "{0} more is closed to the scanner", "Недоступных файлов и папок: ": "Inaccessible files and folders: ", "и ещё {0} поменьше": "and {0} smaller items", "Имя": "Name", "Доля": "Share", "Размер": "Size", "Файлов": "Files", "Изменён": "Modified", "Самые большие файлы": "Largest files", "Тип": "Type", "Расширение": "Extension", "без расширения": "no extension", "Показать такие файлы": "Show these files", "Мелкие файлы: ": "Small files: ", "Видео": "Video", "Музыка": "Music", "Картинки": "Images", "Архивы и образы": "Archives and disk images", "Программы": "Programs", "Документы": "Documents", "Другое": "Other", "В корзину?": "Move to Recycle Bin?", "Удалить": "Delete", "Больше не спрашивать": "Don't ask again", "Спрашивать перед удалением файлов": "Ask before deleting files", "Не получилось": "Failed", "Удалить навсегда": "Delete permanently", "Удалить навсегда?": "Delete permanently?", "Файлы не попадут в корзину, вернуть их будет нельзя.": "Files will not go to the Recycle Bin and cannot be restored.", "Удалено навсегда: ": "Permanently deleted: ", "Часть файлов занята и не удалилась": "Some files are in use and were not deleted", "Отмена": "Cancel", "Закрыть": "Close", "В корзину отправлено ": "Moved to Recycle Bin: ", "Сохранено: ": "Saved: ", "Это системная папка, её удалять нельзя": "This is a system folder and cannot be deleted", "Не получилось: файл занят или удаление отменено": "Failed: the file is in use or deletion was cancelled", "В фоне работают значок в трее и автоочистка памяти, даже когда окно закрыто.": "The tray icon and automatic memory cleanup keep working when the window is closed.", "Держать в трее и запускать вместе с Windows": "Keep in tray and start with Windows", "работает в фоне": "running in background", "фон выключен": "background off", "Язык": "Language", "Русский": "Русский", "Версия": "Version", "Проверить обновления": "Check for updates", "Позже": "Later", "Вышла версия {0}": "Version {0} is out", "Скачиваю обновление…": "Downloading update…", "Не вышло обновиться. Попробуй позже.": "Update failed. Try again later.", "Установлена последняя версия": "You have the latest version", "Не удалось проверить обновления": "Could not check for updates", "Оптимизация включена": "Optimization is on", "Готово": "Ready", "Ошибка: ": "Error: ", "Считаю мусор на диске": "Counting junk on disk", "Очищаю диск": "Cleaning disk", "Очищаю память": "Cleaning memory", "освобождено ": "freed ", "ждёт": "waiting", "Включение": "Turning on", "Выключение": "Turning off", "Настраиваю систему и чищу компьютер. Это займёт до минуты.": "Setting up the system and cleaning the PC. This takes up to a minute.", "Возвращаю все настройки, как было до включения.": "Restoring all settings to how they were.", "План питания как в AntiLag": "AntiLag power plan", "Таймеры, видеокарта, Game DVR": "Timers, GPU, Game DVR", "Работа в фоне и значок в трее": "Background mode and tray icon", "Кэш NVIDIA": "NVIDIA cache", "Прежний план питания": "Previous power plan", "Фоновый режим": "Background mode", "Включаю оптимизацию": "Turning on optimization", "Возвращаю настройки": "Restoring settings", "готово": "done", "ошибка": "error", "идёт…": "running…", "Перезагрузить?": "Restart now?", "Часть настроек (таймеры и реестр) заработает только после перезагрузки.": "Some settings (timers and registry) only apply after a restart.", "Перезагрузить": "Restart", "Перезагрузка через 5 секунд…": "Restarting in 5 seconds…", "Б": "B", "КБ": "KB", "МБ": "MB", "ГБ": "GB", "ТБ": "TB" };
+const EN = { "Яйцечист": "Yaytsechist", "Разделы": "Sections", "Оптимизация": "Optimization", "Диск": "Disk", "Место на диске": "Disk usage", "Память": "Memory", "Настройки": "Settings", "Загрузка": "Loading", "не проверено": "not scanned", "проверяю…": "scanning…", "Оптимизация для игр": "Game optimization", "Таймер Windows": "Windows timer", "План питания": "Power plan", "Работа в фоне": "Background mode", "Включить оптимизацию": "Turn on optimization", "Выключить и вернуть как было": "Turn off and restore settings", "Работает. Окно можно закрыть — программа останется в трее.": "Running. You can close the window, the app stays in the tray.", "План питания, таймер 0.5 мс, без Game DVR. Всё возвращается одной кнопкой.": "Power plan, 0.5 ms timer, no Game DVR. One button restores everything.", "включена": "on", "выключена": "off", "выключено": "off", "работает": "running", " мс": " ms", "обычно 15.6": "usually 15.6", "Очистка диска": "Disk cleanup", "Считаю…": "Counting…", "Пересчитать": "Recount", "Очистить": "Clean", "Очистить ": "Clean ", "Файлы, занятые программами, пропускаются": "Files in use are skipped", "Можно освободить ": "You can free ", "Временные файлы": "Temporary files", "старше суток": "older than a day", "Temp Windows": "Windows Temp", "Windows Update": "Windows Update", "кэш загрузок": "download cache", "Отчёты об ошибках": "Error reports", "и дампы": "and dumps", "Браузеры": "Browsers", "закройте их": "close them first", "Steam / Epic / Discord": "Steam / Epic / Discord", "веб-кэш": "web cache", "Кэш шейдеров": "Shader cache", "только если игры глючат": "only if games glitch", "Корзина": "Recycle Bin", "Кэш After Effects": "After Effects cache", "закройте Adobe": "close Adobe apps first", "навсегда": "permanent", "Очистка памяти": "Memory cleanup", "Очистить память": "Clean memory", "Загрузка оперативной памяти": "Memory load", "Что именно чистить": "What to clean", "Что чистить: {0} из {1}": "What to clean: {0} of {1}", "Занято {0} из {1}": "Used {0} of {1}", "Чистить, когда память занята больше чем": "Clean when memory use is above", "Чистить по расписанию, каждые": "Clean on a schedule, every", " мин": " min", "Порог": "Threshold", "Интервал": "Interval", " меньше": " down", " больше": " up", "Память запущенных программ": "Memory of running apps", "рабочие наборы": "working sets", "Файловый кэш системы": "System file cache", "безопасно": "safe", "Записать кэш файлов на диск": "Write file cache to disk", "Изменённые страницы": "Modified pages", "может подвисать": "may stutter", "Резервная память (standby)": "Standby memory", "Резервная память, низкий приоритет": "Standby memory, low priority", "Кэш реестра": "Registry cache", "Windows 8.1+": "Windows 8.1+", "Объединение одинаковых страниц": "Combine identical pages", "Windows 10+": "Windows 10+", "Что занимает место": "What takes up space", "Другой диск": "Another drive", "Обновить": "Update", "Обновить скан": "Rescan", "В таблицу CSV": "Export to CSV", "Выбрать папку…": "Choose a folder…", "0 файлов": "0 files", "Остановить": "Stop", "Папки": "Folders", "Файлы": "Files", "Типы": "Types", "Найти файл или папку": "Find a file or folder", "Поиск по имени": "Search by name", "Схема: размер прямоугольника — сколько места занимает файл или папка": "Map: the size of a rectangle shows how much space a file or folder takes", "Выбери файл или папку": "Select a file or folder", "Показать в папке": "Show in folder", "Последняя автоочистка: {0}, освобождено {1}": "Last automatic cleanup: {0}, freed {1}", "В корзину": "Move to Recycle Bin", "свободно {0} из {1}": "{0} free of {1}", "{0} в {1}": "{0} in {1}", "свободно {0}": "{0} free", "ещё {0} закрыто от сканера": "{0} more is closed to the scanner", "Недоступных файлов и папок: ": "Inaccessible files and folders: ", "и ещё {0} поменьше": "and {0} smaller items", "Имя": "Name", "Доля": "Share", "Размер": "Size", "Файлов": "Files", "Изменён": "Modified", "Самые большие файлы": "Largest files", "Тип": "Type", "Расширение": "Extension", "без расширения": "no extension", "Показать такие файлы": "Show these files", "Мелкие файлы: ": "Small files: ", "Видео": "Video", "Музыка": "Music", "Картинки": "Images", "Архивы и образы": "Archives and disk images", "Программы": "Programs", "Документы": "Documents", "Другое": "Other", "В корзину?": "Move to Recycle Bin?", "Удалить": "Delete", "Развернуть": "Expand", "Предыдущая версия Windows": "Previous Windows installation", "откат станет невозможен": "rollback will no longer be possible", "Остатки обновлений Windows": "Windows Update leftovers", "долго, до 15 минут": "slow, up to 15 minutes", " и ещё остатки обновлений": " plus update leftovers", "Больше не спрашивать": "Don't ask again", "Спрашивать перед удалением файлов": "Ask before deleting files", "Не получилось": "Failed", "Удалить навсегда": "Delete permanently", "Удалить навсегда?": "Delete permanently?", "Файлы не попадут в корзину, вернуть их будет нельзя.": "Files will not go to the Recycle Bin and cannot be restored.", "Удалено навсегда: ": "Permanently deleted: ", "Часть файлов занята и не удалилась": "Some files are in use and were not deleted", "Отмена": "Cancel", "Закрыть": "Close", "В корзину отправлено ": "Moved to Recycle Bin: ", "Сохранено: ": "Saved: ", "Это системная папка, её удалять нельзя": "This is a system folder and cannot be deleted", "Не получилось: файл занят или удаление отменено": "Failed: the file is in use or deletion was cancelled", "В фоне работают значок в трее и автоочистка памяти, даже когда окно закрыто.": "The tray icon and automatic memory cleanup keep working when the window is closed.", "Держать в трее и запускать вместе с Windows": "Keep in tray and start with Windows", "работает в фоне": "running in background", "фон выключен": "background off", "Язык": "Language", "Русский": "Русский", "Версия": "Version", "Проверить обновления": "Check for updates", "Позже": "Later", "Вышла версия {0}": "Version {0} is out", "Скачиваю обновление…": "Downloading update…", "Не вышло обновиться. Попробуй позже.": "Update failed. Try again later.", "Установлена последняя версия": "You have the latest version", "Не удалось проверить обновления": "Could not check for updates", "Оптимизация включена": "Optimization is on", "Готово": "Ready", "Ошибка: ": "Error: ", "Считаю мусор на диске": "Counting junk on disk", "Очищаю диск": "Cleaning disk", "Очищаю память": "Cleaning memory", "освобождено ": "freed ", "ждёт": "waiting", "Включение": "Turning on", "Выключение": "Turning off", "Настраиваю систему и чищу компьютер. Это займёт до минуты.": "Setting up the system and cleaning the PC. This takes up to a minute.", "Возвращаю все настройки, как было до включения.": "Restoring all settings to how they were.", "План питания как в AntiLag": "AntiLag power plan", "Таймеры, видеокарта, Game DVR": "Timers, GPU, Game DVR", "Работа в фоне и значок в трее": "Background mode and tray icon", "Кэш NVIDIA": "NVIDIA cache", "Прежний план питания": "Previous power plan", "Фоновый режим": "Background mode", "Включаю оптимизацию": "Turning on optimization", "Возвращаю настройки": "Restoring settings", "готово": "done", "ошибка": "error", "идёт…": "running…", "Перезагрузить?": "Restart now?", "Часть настроек (таймеры и реестр) заработает только после перезагрузки.": "Some settings (timers and registry) only apply after a restart.", "Перезагрузить": "Restart", "Перезагрузка через 5 секунд…": "Restarting in 5 seconds…", "Б": "B", "КБ": "KB", "МБ": "MB", "ГБ": "GB", "ТБ": "TB" };
 let lang = 'ru';
 // русский текст — он же ключ перевода; {0} {1} — подстановки
 function t(ru, ...args) {
@@ -369,6 +489,15 @@ async function updInstall() {
   if (!r.ok) { $('updText').textContent = t('Не вышло обновиться. Попробуй позже.'); $('updText').title = r.error; $('updGo').disabled = false; }
 }
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// иконка страницы, как в Notion: то же живое яйцо, что в меню слева
+document.querySelectorAll('.cell[data-view]').forEach(c => {
+  const svg = c.querySelector('svg'), ns = svg.namespaceURI, g = document.createElementNS(ns, 'g'), copy = document.createElementNS(ns, 'svg');
+  g.id = 'ic-' + c.dataset.view; g.append(...svg.childNodes); svg.append(g);
+  copy.setAttribute('viewBox', svg.getAttribute('viewBox')); copy.setAttribute('aria-hidden', 'true');
+  copy.innerHTML = `<use href="#ic-${c.dataset.view}"/>`;
+  const icon = el('div', 'pageicon'); icon.append(copy); $(c.dataset.view).prepend(icon);
+});
 let S = null, sizes = [], busy = false, scanning = false;
 
 function fmt(n) {
@@ -450,6 +579,7 @@ document.querySelectorAll('.cell').forEach(c => c.onclick = () => {
 // цвета типов проверены на различимость, в том числе при дальтонизме; порядок как KINDS в gameboost.py
 const KIND_COLORS = ['#D4724F', '#2FA58F', '#B98A00', '#8E6BD8', '#D9578F', '#3C8FD9', '#6E6C64'];
 const SEP = '\\';
+const mExpanded = new Set();  // раскрытые по стрелке папки текущего списка
 let mInfo = null, mCur = null, mTab = 'dirs', mSelected = null, mTree = [], mLeaves = [], mHover = null, mPaper = null, mTimer = 0;
 const plural = (n, a, b, c) => { const t = n % 100, u = n % 10; return t > 10 && t < 20 ? c : u == 1 ? a : u > 1 && u < 5 ? b : c; };
 const files = n => n.toLocaleString(lang) + ' ' + (lang == 'en' ? (n == 1 ? 'file' : 'files') : plural(n, 'файл', 'файла', 'файлов'));
@@ -501,7 +631,7 @@ function mSummary() {
 }
 
 async function mOpen(path) {
-  mCur = path; mTab = 'dirs'; mSelect(null);
+  mCur = path; mTab = 'dirs'; mSelect(null); mExpanded.clear();
   await mRefresh();
 }
 async function mRefresh() {
@@ -519,16 +649,32 @@ function mHead(a, b, c, d, e) {
   r.append(el('span', '', a), ...[b, c, d, e].map(t => el('span', 'num', t)));
   return r;
 }
-function mRow(name, path, isDir, size, whole, count, mtime) {
+function mRow(name, path, isDir, size, whole, count, mtime, depth = -1) {
   const r = el('button', 'mrow' + (isDir ? ' dir' : '')), bar = el('span', 'bar'), fill = el('i');
   fill.style.width = (whole ? size / whole * 100 : 0) + '%'; bar.append(fill);
   r.title = path; r.dataset.path = path;
   r.setAttribute('aria-selected', path == mSelected);
-  r.append(el('span', 'nm', name), bar, el('span', 'num sz', fmt(size)), el('span', 'num', count), el('span', 'num', day(mtime)));
+  const nm = el('span', 'nm');
+  if (depth >= 0) {  // список папок: отступ по глубине и стрелка у папок
+    nm.style.paddingLeft = depth * 18 + 'px';
+    const caret = el('span', 'caret' + (isDir ? '' : ' none'));
+    if (isDir) {
+      caret.setAttribute('role', 'button'); caret.setAttribute('aria-label', t('Развернуть'));
+      caret.setAttribute('aria-expanded', mExpanded.has(path));
+      caret.onclick = e => { e.stopPropagation(); mToggle(path, !mExpanded.has(path)); };
+      caret.ondblclick = e => e.stopPropagation();
+    }
+    nm.append(caret);
+  }
+  nm.append(el('span', 'nmt', name));
+  r.append(nm, bar, el('span', 'num sz', fmt(size)), el('span', 'num', count), el('span', 'num', day(mtime)));
   r.onclick = () => mSelect(path);
   if (isDir) {
     r.ondblclick = () => mOpen(path);
-    r.onkeydown = e => { if (e.key == 'Enter') { e.preventDefault(); mOpen(path); } };
+    r.onkeydown = e => {
+      if (e.key == 'Enter') { e.preventDefault(); mOpen(path); }
+      if (depth >= 0 && (e.key == 'ArrowRight' || e.key == 'ArrowLeft')) { e.preventDefault(); mToggle(path, e.key == 'ArrowRight'); }
+    };
   }
   return r;
 }
@@ -540,13 +686,38 @@ async function mDirs() {
   crumbs.push(mCrumb(mInfo.path, p));
   for (const part of rel) { p = joinPath(p, part); crumbs.push(el('span', '', '›'), mCrumb(part, p)); }
   $('mCrumbs').replaceChildren(...crumbs);
-  const rows = d.items.map(i => mRow(i.name, joinPath(mCur, i.name), i.dir, i.size, d.size, i.dir ? i.count.toLocaleString(lang) : '', i.mtime));
-  if (d.total > d.items.length) rows.push(el('div', 'mrow mhead', t('и ещё {0} поменьше', d.total - d.items.length)));
-  $('mList').replaceChildren(mHead(t('Имя'), t('Доля'), t('Размер'), t('Файлов'), t('Изменён')), ...rows);
-  $('mList').scrollTop = 0;
+  await mListDirs(d);
   mTree = await api().tree_map(mCur);
   mLegend();
   mDraw();
+}
+// строки папки, а под раскрытыми папками — их содержимое с отступом; доля считается от родителя
+async function mDirRows(d, base, depth) {
+  const rows = [];
+  for (const i of d.items) {
+    const p = joinPath(base, i.name);
+    rows.push(mRow(i.name, p, i.dir, i.size, d.size, i.dir ? i.count.toLocaleString(lang) : '', i.mtime, depth));
+    const sub = i.dir && mExpanded.has(p) && await api().tree_dir(p);
+    if (sub) rows.push(...await mDirRows(sub, p, depth + 1));
+  }
+  if (d.total > d.items.length) {
+    const more = el('div', 'mrow mhead', t('и ещё {0} поменьше', d.total - d.items.length));
+    more.style.paddingLeft = 8 + depth * 18 + 'px';
+    rows.push(more);
+  }
+  return rows;
+}
+async function mListDirs(d) {
+  const list = $('mList'), keep = list.dataset.cur == mCur ? list.scrollTop : 0;
+  list.replaceChildren(mHead(t('Имя'), t('Доля'), t('Размер'), t('Файлов'), t('Изменён')), ...await mDirRows(d, mCur, 0));
+  list.dataset.cur = mCur; list.scrollTop = keep;
+}
+async function mToggle(path, open) {
+  if (open) mExpanded.add(path);
+  else for (const p of [...mExpanded]) if (p == path || p.startsWith(path + SEP)) mExpanded.delete(p);
+  await mListDirs(await api().tree_dir(mCur));
+  const row = [...document.querySelectorAll('#mList [data-path]')].find(r => r.dataset.path == path);
+  if (row) row.focus();
 }
 function mCrumb(text, path) { const b = el('button', '', text); b.onclick = () => mOpen(path); return b; }
 
@@ -750,6 +921,13 @@ $('mMap').oncontextmenu = e => { const l = mHit(e); if (l) mMenu(e, l.path); };
 document.addEventListener('contextmenu', e => { if (!e.target.closest('input')) e.preventDefault(); });  // меню браузера с «Обновить» тут ни к чему
 document.addEventListener('click', () => $('mCtx').hidden = true);
 document.addEventListener('keydown', e => { if (e.key == 'Escape') $('mCtx').hidden = true; });
+// как в Проводнике: Delete — в корзину, Shift+Delete — навсегда
+document.addEventListener('keydown', e => {
+  if (e.key != 'Delete' || !mSelected || $('s5').hidden || !$('modal').hidden || e.target.closest?.('input')) return;
+  e.preventDefault();
+  $('mCtx').hidden = true;
+  mDelete(e.shiftKey);
+});
 $('mList').addEventListener('scroll', () => $('mCtx').hidden = true);
 $('mQuery').oninput = () => { clearTimeout(mQueryTimer); mQueryTimer = setTimeout(mRefresh, 350); };
 
@@ -782,17 +960,18 @@ function render() {
   $('vAgent').replaceChildren(tag(S.agent ? t('работает') : t('выключена'), S.agent ? 'yolk' : 'muted'));
 
   $('cats').replaceChildren(...S.cats.map((c, i) =>
-    toggleRow(t(c.name), [tag(t(c.note), 'muted note'), tag(sizes[i] == null ? '…' : fmt(sizes[i]), c.on ? '' : 'muted')], c.on, () => {
-      c.on = !c.on; api().put('cats', S.cats.map(x => x.on)); render();
+    toggleRow(t(c.name), [tag(t(c.note), 'muted note'), tag(sizes[i] == null ? '…' : sizes[i] < 0 ? '?' : fmt(sizes[i]), c.on ? '' : 'muted')], c.on, () => {
+      c.on = !c.on; api().put('cats', Object.fromEntries(S.cats.map(x => [x.name, x.on]))); render();
     })));
-  const total = S.cats.reduce((s, c, i) => s + (c.on ? sizes[i] || 0 : 0), 0);
-  $('diskTotal').textContent = sizes.length && !scanning ? t('Можно освободить ') + fmt(total) : scanning ? t('Считаю…') : '';
+  const total = S.cats.reduce((s, c, i) => s + (c.on ? Math.max(0, sizes[i] || 0) : 0), 0);
+  const unknown = S.cats.some((c, i) => c.on && sizes[i] < 0);  // остатки обновлений: размер узнаем после очистки
+  $('diskTotal').textContent = sizes.length && !scanning ? t('Можно освободить ') + fmt(total) + (unknown ? t(' и ещё остатки обновлений') : '') : scanning ? t('Считаю…') : '';
   $('tShell').textContent = scanning ? '…' : sizes.length ? fmt(total) : '—';
   $('dirt').style.opacity = Math.min(1, total / 2 ** 30);  // чем больше мусора, тем грязнее скорлупа; полная — от 1 ГБ
   $('diskBtn').querySelector('.label').textContent = sizes.length && total ? t('Очистить ') + fmt(total) : t('Очистить');
-  $('diskBtn').disabled = busy || scanning || !total;
+  $('diskBtn').disabled = busy || scanning || (!total && !unknown);
   document.querySelector('#s2 .ibtn').disabled = busy || scanning;
-  $('diskBtn').classList.toggle('accent', !!total);
+  $('diskBtn').classList.toggle('accent', !!total || unknown);
 
   $('tTray').textContent = S.agent ? t('работает в фоне') : t('фон выключен');
   $('tray').replaceChildren(toggleRow(t('Держать в трее и запускать вместе с Windows'),
