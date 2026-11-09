@@ -121,7 +121,7 @@ section.wide{max-width:none;padding:30px 36px 24px}
 .mrow:hover{background:var(--card)}
 .mrow[aria-selected=true]{background:var(--line)}
 .mrow .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.mrow.dir .nm{font-weight:600}
+.mrow.dir .nm{font-weight:400}
 .mrow .num{font:12px var(--mono);text-align:right;color:var(--muted);white-space:nowrap}
 .mrow .num.sz{color:var(--ink)}
 .mhead{min-height:24px;font-size:12px;color:var(--muted);padding:0 10px}
@@ -129,6 +129,8 @@ section.wide{max-width:none;padding:30px 36px 24px}
 .mhead .num{font:12px var(--sans)}
 #mAct{display:flex;align-items:center;gap:18px;margin-top:10px;min-height:32px;flex:none}
 #mAct .path{flex:1;min-width:0}
+.ic{flex:none;display:grid;width:16px;height:16px;margin-right:8px}
+.ic svg{width:16px;height:16px}
 .caret{display:grid;place-items:center;width:18px;height:18px;margin:0 4px 0 -2px;border-radius:4px;flex:none}
 .caret::before{content:"";border-left:6px solid var(--muted);border-top:4px solid transparent;border-bottom:4px solid transparent;transition:transform .15s}
 .caret[aria-expanded=true]::before{transform:rotate(90deg)}
@@ -206,8 +208,10 @@ summary:hover{color:var(--ink)}
 body{font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
 main{grid-template-columns:240px 1fr}
 .rail{padding:10px 8px 12px;box-shadow:inset -1px 0 rgba(255,255,255,.05)}
-.logo{gap:8px;padding:7px 10px;font:600 14px var(--sans);color:var(--ink)}
-.logo svg{width:16px;height:20px}
+.logo{gap:10px;padding:6px 8px 14px;margin-bottom:6px;box-shadow:inset 0 -1px var(--line)}
+.logo svg{flex:none;width:34px;height:34px;padding:5px 7px;border-radius:9px;background:#2C2C2C;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);overflow:visible}
+.lname b{display:block;font:700 16px/1.2 var(--sans);color:#EDEDED;letter-spacing:-.01em}
+.lname small{display:block;font:12px var(--sans);color:#7F7F7F}
 nav{gap:1px;margin-top:12px}
 .cell{gap:10px;padding:5px 10px;border-radius:6px;transition:background .12s}
 .cell:hover{background:var(--hover)}
@@ -325,7 +329,7 @@ section:not([hidden]){animation:page .22s cubic-bezier(.2,.7,.3,1)}
 
 <main>
 <aside class="rail">
-  <span class="logo"><svg viewBox="0 0 60 76" aria-hidden="true"><use href="#eggPath" fill="#FAF9F5"/><g clip-path="url(#cEgg)"><polygon points="0,45 11,35 20,46 30,34 40,46 49,36 60,45 60,76 0,76" fill="#D97757"/></g></svg>Яйцечист</span>
+  <span class="logo"><svg viewBox="0 0 60 76" aria-hidden="true"><use href="#eggPath" fill="#FAF9F5"/><g clip-path="url(#cEgg)"><polygon points="0,45 11,35 20,46 30,34 40,46 49,36 60,45 60,76 0,76" fill="#D97757"/></g></svg><span class="lname"><b>Яйцечист</b><small id="logoVer"></small></span></span>
   <nav aria-label="Разделы">
     <button class="cell" data-view="s1" aria-current="page"><svg viewBox="0 0 60 76" aria-hidden="true"><use href="#eggPath" fill="url(#gBoiled)"/><circle id="yolkDot" cx="30" cy="46" r="15"/></svg>
       <div><b>Оптимизация</b><span id="tYolk">—</span></div></button>
@@ -649,6 +653,14 @@ function mHead(a, b, c, d, e) {
   r.append(el('span', '', a), ...[b, c, d, e].map(t => el('span', 'num', t)));
   return r;
 }
+// иконки как в Проводнике: жёлтая папка; лист с полоской цвета типа, как на схеме
+const FOLDER_SVG = '<svg viewBox="0 0 16 16"><path d="M1.5 3.5a1 1 0 0 1 1-1h3.4l1.5 1.5h6.1a1 1 0 0 1 1 1V12.5a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1z" fill="#D9A02B"/><path d="M1.5 6.2a1 1 0 0 1 1-1h11a1 1 0 0 1 1 1v6.3a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1z" fill="#F7C548"/></svg>';
+function fileIcon(isDir, path) {
+  const i = el('span', 'ic');
+  i.innerHTML = isDir ? FOLDER_SVG : '<svg viewBox="0 0 16 16"><path d="M3.5 1.5h6l3 3v10h-9z" fill="#E4E4E2"/><path d="M9.5 1.5v3h3" fill="#B4B4B0"/>' +
+    `<rect x="5" y="9.5" width="6" height="2.5" rx=".6" fill="${KIND_COLORS[mKind(path)]}"/></svg>`;
+  return i;
+}
 function mRow(name, path, isDir, size, whole, count, mtime, depth = -1) {
   const r = el('button', 'mrow' + (isDir ? ' dir' : '')), bar = el('span', 'bar'), fill = el('i');
   fill.style.width = (whole ? size / whole * 100 : 0) + '%'; bar.append(fill);
@@ -666,6 +678,7 @@ function mRow(name, path, isDir, size, whole, count, mtime, depth = -1) {
     }
     nm.append(caret);
   }
+  nm.append(fileIcon(isDir, path));
   nm.append(el('span', 'nmt', name));
   r.append(nm, bar, el('span', 'num sz', fmt(size)), el('span', 'num', count), el('span', 'num', day(mtime)));
   r.onclick = () => mSelect(path);
@@ -1084,7 +1097,7 @@ async function antilag() {
 
 window.addEventListener('pywebviewready', async () => {
   S = await api().get(); lang = S.lang; mExtKind = S.ext_kinds;
-  $('vVer').textContent = S.version; translatePage();
+  $('vVer').textContent = S.version; $('logoVer').textContent = 'v' + S.version; translatePage();
   render(); poll(); setInterval(poll, 2000); updCheck();
 });
 </script>
