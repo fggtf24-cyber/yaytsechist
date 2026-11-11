@@ -8,7 +8,7 @@
     python gameboost.py --agent     — фоновый агент (таймер 0.5 мс + автоочистка RAM), запускается планировщиком
     python gameboost.py --uninstall ПУТЬ — открыть «Удаление программ» с программой этого ярлыка или exe (меню Проводника)
 """
-import csv, ctypes, fnmatch, glob, hashlib, heapq, json, os, re, shutil, stat, subprocess, sys, tempfile, threading, time, urllib.request, winreg
+import codecs, csv, ctypes, fnmatch, glob, hashlib, heapq, json, os, re, shutil, stat, subprocess, sys, tempfile, threading, time, urllib.request, winreg
 from array import array
 from ctypes import byref, sizeof, wintypes
 from pathlib import Path
@@ -910,19 +910,57 @@ def installed():
         for sub in reg_children(hive, rf"{base}\{UNINSTALL}"):
             key = rf"{hive}\{base}\{UNINSTALL}\{sub}"
             v = {n: reg_get(hive, key.partition("\\")[2], n) for n in ("DisplayName", "UninstallString", "Publisher", "DisplayVersion",
-                                                                     "EstimatedSize", "InstallLocation", "DisplayIcon", "SystemComponent", "ParentKeyName")}
+                                                                     "EstimatedSize", "InstallLocation", "DisplayIcon", "SystemComponent",
+                                                                     "ParentKeyName", "WindowsInstaller", HOOK_VALUE)}
             name, cmd = str(v["DisplayName"] or "").strip(), str(v["UninstallString"] or "").strip()
+            if is_hook(cmd) and v[HOOK_VALUE]:
+                cmd = v[HOOK_VALUE]  # кнопку «Удалить» перехватили мы — настоящая команда сохранена рядом
             if not name or not cmd or v["SystemComponent"] == 1 or v["ParentKeyName"]:
                 continue  # системные компоненты и обновления к программам «Параметры» тоже прячут
             size = v["EstimatedSize"]
             found.setdefault((name, v["DisplayVersion"]), {
                 "id": key, "name": name, "publisher": str(v["Publisher"] or "").strip(), "cmd": cmd, "version": str(v["DisplayVersion"] or ""),
+                "msi": v["WindowsInstaller"] == 1,
                 "size": size * 1024 if isinstance(size, int) else 0,
                 "location": os.path.expandvars(str(v["InstallLocation"] or "")).strip().strip('"').rstrip("\\"),
                 "icon": os.path.expandvars(str(v["DisplayIcon"] or "")).split(",")[0].strip().strip('"')})
     APPS.clear()
     APPS.update((a["id"], a) for a in found.values())
     return sorted(APPS.values(), key=lambda a: a["name"].casefold())
+
+
+# Кнопка «Удалить» в «Параметрах» запускает UninstallString из реестра. Подменяем её на Яйцечист, а настоящую храним рядом.
+# MSI-программы Windows удаляет сама, мимо этой строки, поэтому их не трогаем.
+HOOK_VALUE = "YaytsechistUninstallString"
+
+
+def is_hook(cmd):
+    return "--uninstall-key" in str(cmd or "")
+
+
+def hook(a):
+    hive, _, path = a["id"].partition("\\")
+    raw = reg_get(hive, path, "UninstallString")
+    want = f'"{EXE}" {SCRIPT}--uninstall-key "{a["id"]}"'
+    if raw and raw != want:
+        if not is_hook(raw):
+            reg_set(hive, path, HOOK_VALUE, raw)  # первая подмена или программа обновилась и записала свою строку заново
+        reg_set(hive, path, "UninstallString", want)
+
+
+def unhook(a):
+    """Вернуть как было: настоящую строку на место, нашу копию убрать."""
+    hive, _, path = a["id"].partition("\\")
+    saved = reg_get(hive, path, HOOK_VALUE)
+    if saved and is_hook(reg_get(hive, path, "UninstallString")):
+        reg_set(hive, path, "UninstallString", saved)
+    if saved:
+        reg_set(hive, path, HOOK_VALUE, None)
+
+
+def sync_hooks(on):
+    for a in installed():
+        hook(a) if on and not a["msi"] else unhook(a)
 
 
 def app_home(a):
@@ -956,6 +994,76 @@ def app_names(a):
     if base and (base in full or full in base):  # папку, принятую только из-за удалителя внутри, именем не считаем
         names.add(base)
     return {n for n in names if len(n) >= 3 and n not in BLOCK and (n == full or not shared_name(n, a))}, pub if len(pub) >= 3 and pub not in BLOCK - {"microsoft"} else ""
+
+
+# ---------- когда программу запускали в последний раз ----------
+
+USERASSIST = r"Software\Microsoft\Windows\CurrentVersion\Explorer\UserAssist"
+PREFETCH = os.path.join(W, "Prefetch")
+KNOWN_FOLDERS = {"{6D809377-6AF0-444B-8957-A3773F02200E}": "ProgramW6432", "{7C5A40EF-A0FB-4BFC-874A-C0F2E0B9FA8E}": "ProgramFiles(x86)",
+                 "{F1B32785-6FBA-4FCF-9D55-7B8E7F157091}": "LOCALAPPDATA", "{3EB685DB-65F9-4CF6-A03A-E3EF65729F3D}": "APPDATA",
+                 "{62AB5D82-FDC1-4DC3-A9DD-070D1D495D97}": "ProgramData", "{5E6C858F-0E22-4760-9AFE-EA3317B67173}": "USERPROFILE"}
+NOT_MAIN = re.compile(r"(?i)^(?:unins|uninst|update|setup|crash|helper|install|maintenance|elevat|notification)")
+
+
+def launches(prefetch=PREFETCH):
+    """Журналы запусков Windows: UserAssist — полные пути exe и имена ярлыков, запущенных из «Пуска» и Проводника;
+    Prefetch — имена exe, запущенных как угодно (папку видит только администратор). Время — в секундах Unix."""
+    paths, lnks, exes = {}, {}, {}
+    put = lambda d, k, t: d.__setitem__(k, max(d.get(k, 0), t))
+    for g in reg_children("HKCU", USERASSIST):
+        try:
+            k = winreg.OpenKey(winreg.HKEY_CURRENT_USER, rf"{USERASSIST}\{g}\Count")
+        except OSError:
+            continue
+        with k:
+            for i in range(winreg.QueryInfoKey(k)[1]):
+                name, data, _ = winreg.EnumValue(k, i)
+                ft = int.from_bytes(data[60:68], "little") if isinstance(data, bytes) and len(data) >= 68 else 0
+                if not ft:
+                    continue
+                t, name = ft / 1e7 - 11644473600, codecs.decode(name, "rot13")  # FILETIME → Unix; имена записаны ROT13
+                for guid, env in KNOWN_FOLDERS.items():
+                    if name.upper().startswith(guid):
+                        name = os.environ.get(env, guid) + name[len(guid):]
+                if name.lower().endswith(".lnk"):
+                    put(lnks, norm(Path(name).stem), t)
+                elif name.lower().endswith(".exe"):
+                    put(paths, os.path.normcase(name), t)
+    try:
+        for e in os.scandir(prefetch):
+            if e.name.lower().endswith(".pf"):  # ADOBE PREMIERE PRO.EXE-1A2B3C4D.pf
+                put(exes, e.name.rsplit("-", 1)[0].lower(), e.stat().st_mtime)
+    except OSError:
+        pass
+    return paths, lnks, exes
+
+
+def app_exes(a):
+    """Основные exe программы: из значка и из корня её папки, без удалителей и обновлялок."""
+    found = {os.path.basename(a["icon"]).lower()} if a["icon"].lower().endswith(".exe") else set()
+    if home := app_home(a):
+        try:
+            found.update(e.name.lower() for e in os.scandir(home) if e.name.lower().endswith(".exe"))
+        except OSError:
+            pass
+    return {n for n in found if not NOT_MAIN.match(n)}
+
+
+def last_used(apps, runs):
+    """a["used"]: когда запускали в последний раз, 0 — Windows об этом не помнит."""
+    paths, lnks, exes = runs
+    names = {a["id"]: app_exes(a) for a in apps}
+    seen = {}
+    for s in names.values():
+        for n in s:
+            seen[n] = seen.get(n, 0) + 1
+    for a in apps:
+        homes = [os.path.normcase(h) + os.sep for h in (app_home(a), a["icon"] and os.path.dirname(a["icon"])) if h and not protected(h)]
+        times = [t for p, t in paths.items() if any(p.startswith(h) for h in homes)]
+        times += [lnks[n] for n in app_names(a)[0] if n in lnks]
+        times += [exes[n[:29]] for n in names[a["id"]] if seen[n] == 1 and n[:29] in exes]  # Update.exe есть у многих — по нему не судим
+        a["used"] = int(max(times, default=0))
 
 
 def file_roots():
@@ -1159,7 +1267,7 @@ def migrate_cats(cats):
 
 
 DEFAULTS = {"applied": None, "cats": {c[0]: c[3] for c in CATEGORIES}, "ram_mask": RAM_DEFAULT,
-            "auto_on": False, "auto_pct": 90, "int_on": False, "int_min": 30, "tray_on": False, "lang": "", "ask_delete": True, "menu_on": True}
+            "auto_on": False, "auto_pct": 90, "int_on": False, "int_min": 30, "tray_on": False, "lang": "", "ask_delete": True, "menu_on": True, "hook_on": False}
 
 
 def load(fallback=None):
@@ -1182,7 +1290,7 @@ def save(data):
 
 # ---------- обновление и язык ----------
 
-VERSION = "1.2.1"
+VERSION = "1.3.0"
 REPO, ASSET = "fggtf24-cyber/yaytsechist", "Yaytsechist.exe"
 TITLES = {"ru": "Яйцечист", "en": "Yaytsechist"}
 
@@ -1283,7 +1391,7 @@ class Api:
                 "cats": [{"name": c[0], "note": c[4], "on": st["cats"].get(c[0], c[3])} for c in CATEGORIES],
                 "areas": [{"flag": f, "name": n, "note": t} for f, n, t in RAM_AREAS],
                 "kinds": [k[0] for k in KINDS] + ["Другое"], "ext_kinds": KIND_OF, "lang": lang_of(st), "version": VERSION,
-                "mask": st["ram_mask"], **{k: st[k] for k in ("auto_on", "auto_pct", "int_on", "int_min", "tray_on", "ask_delete", "menu_on")}}
+                "mask": st["ram_mask"], **{k: st[k] for k in ("auto_on", "auto_pct", "int_on", "int_min", "tray_on", "ask_delete", "menu_on", "hook_on")}}
 
     def sysinfo(self):
         return {"timer": query_timer(), "plan": plan_name()}
@@ -1311,6 +1419,8 @@ class Api:
             sync_agent(st)
         if key == "menu_on":
             sync_menu(value)
+        if key == "hook_on":
+            sync_hooks(value)
         if key == "lang":
             import webview
             webview.windows[0].set_title(TITLES[value])
@@ -1448,7 +1558,11 @@ class Api:
         run("shutdown", "/r", "/t", "5")
 
     def apps(self):
-        return [{k: a[k] for k in ("id", "name", "publisher", "size", "location")} for a in installed()]
+        if load()["hook_on"]:
+            sync_hooks(True)  # новые программы, обновившиеся и те, чьё удаление отменили
+        apps = installed()
+        last_used(apps, launches())
+        return [{k: a[k] for k in ("id", "name", "publisher", "size", "location", "used")} for a in apps]
 
     def app_request(self):
         """Нажали «Удалить через Яйцечист» в Проводнике: вывести окно и сказать, какую программу выделить."""
@@ -1464,12 +1578,21 @@ class Api:
             u32.SetForegroundWindow(h)
         if not APPS:
             installed()
+        if path.startswith("key:"):  # нажали «Удалить» в «Параметрах» — сразу спросить про удаление
+            key, (hive, _, rest) = path[4:], path[4:].partition("\\")
+            name = reg_get(hive, rest, "DisplayName") if hive in HIVES else None
+            found = key if key in APPS else next((a["id"] for a in APPS.values() if a["name"] == name), None)
+            return {"path": name or key, "id": found, "ask": True}
         return {"path": path, "id": find_app(path)}
 
     def uninstall_start(self, app_id):
         global PROC
+        a = APPS.get(app_id)
+        if not a or is_hook(a["cmd"]):
+            return tr("Не нашлась команда удаления этой программы", "This program's uninstall command was not found")
+        unhook(a)  # своему удалителю программа достаётся с реестром как был; если удаление отменят — перехватим снова
         try:
-            PROC = subprocess.Popen(uninstall_cmd(APPS[app_id]["cmd"]))
+            PROC = subprocess.Popen(uninstall_cmd(a["cmd"]))
         except (OSError, KeyError) as e:
             return str(e)
 
@@ -1538,7 +1661,7 @@ def gui(check=False):
         if FROZEN:
             programs = Path(os.environ["APPDATA"]) / "Microsoft" / "Windows" / "Start Menu" / "Programs"
             threading.Thread(target=lambda: (make_shortcut(str(programs / f"{TITLES[lang_of(load())]}.lnk"), sys.executable),
-                                             sync_menu(load()["menu_on"])), daemon=True).start()
+                                             sync_menu(load()["menu_on"]), load()["hook_on"] and sync_hooks(True)), daemon=True).start()
         titlebar()
         if check:
             probe()
@@ -1678,6 +1801,30 @@ def selftest():
         APPS[bass["id"]] = bass
         assert app_home(bass) == "" and not leftovers(bass, roots=[root], soft=[]), "предложена общая папка издателя"
         APPS.clear()
+    test_key = r"HKCU\Software\YaytsechistSelftest"  # подмена кнопки «Удалить» и возврат как было — на своём ключе
+    t_app = {"id": test_key}
+    reg_set("HKCU", test_key[5:], "UninstallString", '"C:\\x\\unins000.exe" /S')
+    try:
+        hook(t_app)
+        assert is_hook(reg_get("HKCU", test_key[5:], "UninstallString")) and reg_get("HKCU", test_key[5:], HOOK_VALUE) == '"C:\\x\\unins000.exe" /S'
+        hook(t_app)  # повторно — копия не затирается нашей же строкой
+        reg_set("HKCU", test_key[5:], "UninstallString", '"C:\\x\\new.exe"')  # программа обновилась
+        hook(t_app)
+        assert reg_get("HKCU", test_key[5:], HOOK_VALUE) == '"C:\\x\\new.exe"', "после обновления программы сохранилась старая команда"
+        unhook(t_app)
+        assert reg_get("HKCU", test_key[5:], "UninstallString") == '"C:\\x\\new.exe"' and reg_get("HKCU", test_key[5:], HOOK_VALUE) is None
+    finally:
+        winreg.DeleteKey(winreg.HKEY_CURRENT_USER, test_key[5:])
+    with tempfile.TemporaryDirectory() as root:  # последний запуск: путь из UserAssist, ярлык, имя exe из Prefetch
+        for d in ("Foo", "Bar", "Baz"):
+            os.makedirs(os.path.join(root, d))
+            Path(root, d, "Update.exe").write_text("x")
+        mk = lambda n, **k: {"id": n, "name": n, "publisher": "", "location": os.path.join(root, n), "icon": os.path.join(root, n, n + ".exe"), "cmd": "", **k}
+        apps = [mk("Foo"), mk("Bar"), mk("Baz")]
+        runs = ({os.path.normcase(os.path.join(root, "Foo", "sub", "foo.exe")): 100.0}, {"bar": 200.0}, {"baz.exe": 300.0, "update.exe": 999.0})
+        last_used(apps, runs)
+        assert [a["used"] for a in apps] == [100, 200, 300], [a["used"] for a in apps]
+        assert launches(os.path.join(root, "нет"))[2] == {}
     with tempfile.TemporaryDirectory() as root:  # Adobe: удаляем только папки своей версии и версий, которых уже нет
         for d in (r"After Effects\26.0", r"After Effects\25.6", r"After Effects\Logs", "Adobe Photoshop 2025", "Adobe Photoshop 2026", "Common"):
             os.makedirs(os.path.join(root, d))
@@ -1702,10 +1849,13 @@ def selftest():
 
 
 if __name__ == "__main__":
-    if "--uninstall" in sys.argv:  # из меню Проводника: запомнить путь, а дальше обычный запуск без лишних аргументов
-        i = sys.argv.index("--uninstall")
+    # из меню Проводника (--uninstall путь) или кнопкой «Удалить» в «Параметрах» (--uninstall-key ключ):
+    # запомнить, что удалять, а дальше обычный запуск без лишних аргументов
+    if flag := next((f for f in ("--uninstall", "--uninstall-key") if f in sys.argv), None):
+        i = sys.argv.index(flag)
         STATE.parent.mkdir(parents=True, exist_ok=True)
-        UNINSTALL_REQ.write_text(sys.argv[i + 1] if i + 1 < len(sys.argv) else "", "utf-8")
+        arg = sys.argv[i + 1] if i + 1 < len(sys.argv) else ""
+        UNINSTALL_REQ.write_text(("key:" if flag == "--uninstall-key" else "") + arg, "utf-8")
         del sys.argv[i:i + 2]
         ctypes.windll.user32.AllowSetForegroundWindow(-1)  # ASFW_ANY: окно само выйдет вперёд
         k = ctypes.WinDLL("kernel32", use_last_error=True)
