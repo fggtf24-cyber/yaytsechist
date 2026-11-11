@@ -153,9 +153,27 @@ def query_timer():
     return cur.value / 10000
 
 
+powrprof = ctypes.WinDLL("powrprof")
+powrprof.PowerGetActiveScheme.argtypes = (ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p))
+powrprof.PowerReadFriendlyName.argtypes = (ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p,
+                                           ctypes.c_void_p, ctypes.POINTER(wintypes.DWORD))
+k32.LocalFree.argtypes = (ctypes.c_void_p,)
+
+
 def plan_name():
-    m = re.search(r"\((.+)\)\s*$", run("powercfg", "/getactivescheme")[1].strip())
-    return m.group(1) if m else "—"
+    """Через API, а не текст powercfg: тот идёт в кодировке консоли, и в нерусской Windows кириллица становится «???»."""
+    g = ctypes.c_void_p()
+    if powrprof.PowerGetActiveScheme(None, byref(g)):
+        return "—"
+    try:
+        size = wintypes.DWORD()
+        powrprof.PowerReadFriendlyName(None, g, None, None, None, byref(size))
+        buf = ctypes.create_string_buffer(size.value)
+        if powrprof.PowerReadFriendlyName(None, g, None, None, buf, byref(size)):
+            return "—"
+        return ctypes.wstring_at(buf) or "—"
+    finally:
+        k32.LocalFree(g)
 
 
 def enable():
@@ -911,7 +929,7 @@ def installed():
             key = rf"{hive}\{base}\{UNINSTALL}\{sub}"
             v = {n: reg_get(hive, key.partition("\\")[2], n) for n in ("DisplayName", "UninstallString", "Publisher", "DisplayVersion",
                                                                      "EstimatedSize", "InstallLocation", "DisplayIcon", "SystemComponent",
-                                                                     "ParentKeyName", "WindowsInstaller", HOOK_VALUE)}
+                                                                     "ParentKeyName", HOOK_VALUE)}
             name, cmd = str(v["DisplayName"] or "").strip(), str(v["UninstallString"] or "").strip()
             if is_hook(cmd) and v[HOOK_VALUE]:
                 cmd = v[HOOK_VALUE]  # кнопку «Удалить» перехватили мы — настоящая команда сохранена рядом
@@ -919,9 +937,7 @@ def installed():
                 continue  # системные компоненты и обновления к программам «Параметры» тоже прячут
             size = v["EstimatedSize"]
             found.setdefault((name, v["DisplayVersion"]), {
-                "id": key, "name": name, "publisher": str(v["Publisher"] or "").strip(), "cmd": cmd, "version": str(v["DisplayVersion"] or ""),
-                "msi": v["WindowsInstaller"] == 1,
-                "size": size * 1024 if isinstance(size, int) else 0,
+                "id": key, "name": name, "publisher": str(v["Publisher"] or "").strip(), "cmd": cmd, "version": str(v["DisplayVersion"] or ""),                "size": size * 1024 if isinstance(size, int) else 0,
                 "location": os.path.expandvars(str(v["InstallLocation"] or "")).strip().strip('"').rstrip("\\"),
                 "icon": os.path.expandvars(str(v["DisplayIcon"] or "")).split(",")[0].strip().strip('"')})
     APPS.clear()
@@ -930,8 +946,8 @@ def installed():
 
 
 # Кнопка «Удалить» в «Параметрах» запускает UninstallString из реестра. Подменяем её на Яйцечист, а настоящую храним рядом.
-# MSI-программы Windows удаляет сама, мимо этой строки, поэтому их не трогаем.
-HOOK_VALUE = "YaytsechistUninstallString"
+# MSI-программы с WindowsInstaller=1 «Параметры» удаляют сами, мимо этой строки, — флаг на время снимаем и храним рядом.
+HOOK_VALUE, MSI_VALUE = "YaytsechistUninstallString", "YaytsechistWindowsInstaller"
 
 
 def is_hook(cmd):
@@ -946,6 +962,9 @@ def hook(a):
         if not is_hook(raw):
             reg_set(hive, path, HOOK_VALUE, raw)  # первая подмена или программа обновилась и записала свою строку заново
         reg_set(hive, path, "UninstallString", want)
+    if raw and reg_get(hive, path, "WindowsInstaller") == 1:
+        reg_set(hive, path, MSI_VALUE, 1)
+        reg_set(hive, path, "WindowsInstaller", 0)
 
 
 def unhook(a):
@@ -956,11 +975,17 @@ def unhook(a):
         reg_set(hive, path, "UninstallString", saved)
     if saved:
         reg_set(hive, path, HOOK_VALUE, None)
+    if reg_get(hive, path, MSI_VALUE) == 1:
+        reg_set(hive, path, "WindowsInstaller", 1)
+        reg_set(hive, path, MSI_VALUE, None)
 
 
 def sync_hooks(on):
     for a in installed():
-        hook(a) if on and not a["msi"] else unhook(a)
+        try:
+            hook(a) if on else unhook(a)
+        except OSError:
+            pass  # без прав администратора записи в HKLM не изменить — остальные всё равно приводим в порядок
 
 
 def app_home(a):
@@ -1267,7 +1292,7 @@ def migrate_cats(cats):
 
 
 DEFAULTS = {"applied": None, "cats": {c[0]: c[3] for c in CATEGORIES}, "ram_mask": RAM_DEFAULT,
-            "auto_on": False, "auto_pct": 90, "int_on": False, "int_min": 30, "tray_on": False, "lang": "", "ask_delete": True, "menu_on": True, "hook_on": False}
+            "auto_on": False, "auto_pct": 90, "int_on": False, "int_min": 30, "tray_on": False, "lang": "", "ask_delete": True, "menu_on": True, "hook_on": False, "ask_left": False}
 
 
 def load(fallback=None):
@@ -1290,7 +1315,7 @@ def save(data):
 
 # ---------- обновление и язык ----------
 
-VERSION = "1.3.0"
+VERSION = "1.3.1"
 REPO, ASSET = "fggtf24-cyber/yaytsechist", "Yaytsechist.exe"
 TITLES = {"ru": "Яйцечист", "en": "Yaytsechist"}
 
@@ -1391,7 +1416,7 @@ class Api:
                 "cats": [{"name": c[0], "note": c[4], "on": st["cats"].get(c[0], c[3])} for c in CATEGORIES],
                 "areas": [{"flag": f, "name": n, "note": t} for f, n, t in RAM_AREAS],
                 "kinds": [k[0] for k in KINDS] + ["Другое"], "ext_kinds": KIND_OF, "lang": lang_of(st), "version": VERSION,
-                "mask": st["ram_mask"], **{k: st[k] for k in ("auto_on", "auto_pct", "int_on", "int_min", "tray_on", "ask_delete", "menu_on", "hook_on")}}
+                "mask": st["ram_mask"], **{k: st[k] for k in ("auto_on", "auto_pct", "int_on", "int_min", "tray_on", "ask_delete", "menu_on", "hook_on", "ask_left")}}
 
     def sysinfo(self):
         return {"timer": query_timer(), "plan": plan_name()}
@@ -1558,8 +1583,7 @@ class Api:
         run("shutdown", "/r", "/t", "5")
 
     def apps(self):
-        if load()["hook_on"]:
-            sync_hooks(True)  # новые программы, обновившиеся и те, чьё удаление отменили
+        sync_hooks(load()["hook_on"])  # реестр всегда как галочка: новые, обновившиеся, отменённые; выключено — вернуть всё
         apps = installed()
         last_used(apps, launches())
         return [{k: a[k] for k in ("id", "name", "publisher", "size", "location", "used")} for a in apps]
@@ -1661,7 +1685,7 @@ def gui(check=False):
         if FROZEN:
             programs = Path(os.environ["APPDATA"]) / "Microsoft" / "Windows" / "Start Menu" / "Programs"
             threading.Thread(target=lambda: (make_shortcut(str(programs / f"{TITLES[lang_of(load())]}.lnk"), sys.executable),
-                                             sync_menu(load()["menu_on"]), load()["hook_on"] and sync_hooks(True)), daemon=True).start()
+                                             sync_menu(load()["menu_on"]), sync_hooks(load()["hook_on"])), daemon=True).start()
         titlebar()
         if check:
             probe()
@@ -1813,6 +1837,11 @@ def selftest():
         assert reg_get("HKCU", test_key[5:], HOOK_VALUE) == '"C:\\x\\new.exe"', "после обновления программы сохранилась старая команда"
         unhook(t_app)
         assert reg_get("HKCU", test_key[5:], "UninstallString") == '"C:\\x\\new.exe"' and reg_get("HKCU", test_key[5:], HOOK_VALUE) is None
+        reg_set("HKCU", test_key[5:], "WindowsInstaller", 1)  # MSI: флаг снимается на время подмены и возвращается
+        hook(t_app)
+        assert reg_get("HKCU", test_key[5:], "WindowsInstaller") == 0 and reg_get("HKCU", test_key[5:], MSI_VALUE) == 1
+        unhook(t_app)
+        assert reg_get("HKCU", test_key[5:], "WindowsInstaller") == 1 and reg_get("HKCU", test_key[5:], MSI_VALUE) is None
     finally:
         winreg.DeleteKey(winreg.HKEY_CURRENT_USER, test_key[5:])
     with tempfile.TemporaryDirectory() as root:  # последний запуск: путь из UserAssist, ярлык, имя exe из Prefetch
@@ -1840,6 +1869,7 @@ def selftest():
     bcd = "identifier              {current}\nuseplatformtick         Yes\ndisabledynamictick      Да\nnx  OptIn\n"
     assert parse_bcd(bcd) == {"useplatformtick": "yes", "disabledynamictick": "yes"}, parse_bcd(bcd)
     assert all(len(t) == 3 for t in POWER_TWEAKS) and all(h in HIVES for h, *_ in REG_TWEAKS)
+    assert plan_name() not in ("—", "") and "?" not in plan_name(), plan_name()
     assert 0.4 < set_timer(True) <= 1.0 and query_timer() <= 1.0, "таймер не встал"
     set_timer(False)
     m = mem()
