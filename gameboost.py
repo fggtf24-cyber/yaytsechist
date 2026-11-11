@@ -6,6 +6,7 @@
     python gameboost.py --selftest  — самопроверка
     python gameboost.py --update    — обновиться с GitHub без окна
     python gameboost.py --agent     — фоновый агент (таймер 0.5 мс + автоочистка RAM), запускается планировщиком
+    python gameboost.py --uninstall ПУТЬ — открыть «Удаление программ» с программой этого ярлыка или exe (меню Проводника)
 """
 import csv, ctypes, fnmatch, glob, hashlib, heapq, json, os, re, shutil, stat, subprocess, sys, tempfile, threading, time, urllib.request, winreg
 from array import array
@@ -859,6 +860,294 @@ def recycle(path, undo=True):
     return ctypes.windll.shell32.SHFileOperationW(byref(op)) == 0 and not op.fAnyOperationsAborted and not os.path.lexists(path)
 
 
+# ---------- удаление программ (как Revo Uninstaller) ----------
+
+UNINSTALL = r"Microsoft\Windows\CurrentVersion\Uninstall"
+UNINSTALL_VIEWS = [("HKLM", "SOFTWARE"), ("HKLM", r"SOFTWARE\WOW6432Node"), ("HKCU", "Software")]
+SOFT = UNINSTALL_VIEWS  # где программы хранят настройки: Software\Программа или Software\Издатель\Программа
+UNINSTALL_REQ = STATE.with_name("uninstall")  # путь, по которому нажали «Удалить через Яйцечист»
+REG_BACKUP = STATE.with_name("reg-backup")
+MENU_KEYS = [rf"Software\Classes\{c}\shell\YaytsechistUninstall" for c in ("lnkfile", "exefile")]
+APPS, LEFT, PROC = {}, {}, None
+VERSION_NOISE = re.compile(r"\(.*?\)|\b(?:v?\d+(?:\.\d+)+|x64|x86|64-bit|32-bit|amd64|win64|win32)\b", re.I)
+CORP = re.compile(r"\b(?:corporation|corp|inc|ltd|llc|gmbh|limited|co|ag|sa)\b", re.I)
+# такие имена слишком общие: папку с ними не считаем остатком, даже если совпало
+BLOCK = {"microsoft", "windows", "classes", "policies", "wow6432node", "clients", "programs", "program", "common", "commonfiles",
+         "temp", "packages", "bin", "app", "apps", "application", "current", "data", "files", "shared", "tools", "launcher",
+         "client", "setup", "update", "updater", "cache", "user", "users", "local", "roaming", "default", "games", "game"}
+
+
+def norm(s):
+    return re.sub(r"[\W_]+", "", s.casefold())
+
+
+def exe_of(cmd):
+    m = re.match(r'\s*"([^"]+)"|\s*(.+?\.exe)\b', cmd, re.I)
+    return (m.group(1) or m.group(2)) if m else ""
+
+
+def reg_children(hive, path):
+    try:
+        with winreg.OpenKey(HIVES[hive], path, 0, winreg.KEY_READ | winreg.KEY_WOW64_64KEY) as k:
+            return [winreg.EnumKey(k, i) for i in range(winreg.QueryInfoKey(k)[0])]
+    except OSError:
+        return []
+
+
+def key_exists(path):
+    hive, _, rest = path.partition("\\")
+    try:
+        winreg.OpenKey(HIVES[hive], rest, 0, winreg.KEY_READ | winreg.KEY_WOW64_64KEY).Close()
+        return True
+    except OSError:
+        return False
+
+
+def installed():
+    """Программы из тех же ключей реестра, что читают «Параметры». id — полный путь к ключу программы."""
+    found = {}
+    for hive, base in UNINSTALL_VIEWS:
+        for sub in reg_children(hive, rf"{base}\{UNINSTALL}"):
+            key = rf"{hive}\{base}\{UNINSTALL}\{sub}"
+            v = {n: reg_get(hive, key.partition("\\")[2], n) for n in ("DisplayName", "UninstallString", "Publisher", "DisplayVersion",
+                                                                     "EstimatedSize", "InstallLocation", "DisplayIcon", "SystemComponent", "ParentKeyName")}
+            name, cmd = str(v["DisplayName"] or "").strip(), str(v["UninstallString"] or "").strip()
+            if not name or not cmd or v["SystemComponent"] == 1 or v["ParentKeyName"]:
+                continue  # системные компоненты и обновления к программам «Параметры» тоже прячут
+            size = v["EstimatedSize"]
+            found.setdefault((name, v["DisplayVersion"]), {
+                "id": key, "name": name, "publisher": str(v["Publisher"] or "").strip(), "cmd": cmd, "version": str(v["DisplayVersion"] or ""),
+                "size": size * 1024 if isinstance(size, int) else 0,
+                "location": os.path.expandvars(str(v["InstallLocation"] or "")).strip().strip('"').rstrip("\\"),
+                "icon": os.path.expandvars(str(v["DisplayIcon"] or "")).split(",")[0].strip().strip('"')})
+    APPS.clear()
+    APPS.update((a["id"], a) for a in found.values())
+    return sorted(APPS.values(), key=lambda a: a["name"].casefold())
+
+
+def app_home(a):
+    """Папка установки, если ей можно верить: её имя похоже на название или прямо в ней лежит удалитель.
+    Бывает, что установщик пишет туда общую папку вроде D:\\Games — её трогать нельзя."""
+    loc = a["location"]
+    if not loc or protected(loc):
+        return ""
+    base, full = norm(os.path.basename(loc)), norm(VERSION_NOISE.sub(" ", a["name"]))
+    if len(base) < 3 or base in BLOCK or base != full and (base in norm(a["publisher"]) or shared_name(base, a)):
+        return ""  # Adobe пишет сюда C:\Program Files\Adobe — папку всех своих программ
+    if base in full or full in base:
+        return loc
+    own = [os.path.dirname(x) for x in (a["icon"], exe_of(os.path.expandvars(a["cmd"]))) if x]
+    return loc if any(os.path.normcase(d) == os.path.normcase(loc) for d in own) else ""
+
+
+def shared_name(n, a):
+    """Имя общее, если с него начинается название другой программы или оно входит в имя её издателя (Ample Sound, Arturia)."""
+    return any(x["id"] != a["id"] and (norm(x["name"]).startswith(n) or n in norm(x["publisher"])) for x in APPS.values())
+
+
+def app_names(a):
+    """Под какими именами программа заводит свои папки и ключи реестра, и имя издателя."""
+    full = norm(VERSION_NOISE.sub(" ", a["name"]))
+    pub = norm(CORP.sub(" ", a["publisher"]))
+    names = {full}
+    if pub and full.startswith(pub):
+        names.add(full[len(pub):])  # Google Chrome лежит в Google\Chrome
+    base = norm(os.path.basename(app_home(a)))
+    if base and (base in full or full in base):  # папку, принятую только из-за удалителя внутри, именем не считаем
+        names.add(base)
+    return {n for n in names if len(n) >= 3 and n not in BLOCK and (n == full or not shared_name(n, a))}, pub if len(pub) >= 3 and pub not in BLOCK - {"microsoft"} else ""
+
+
+def file_roots():
+    e = lambda k: os.environ.get(k, "")
+    menu = r"Microsoft\Windows\Start Menu\Programs"
+    roots = [e("ProgramFiles"), e("ProgramFiles(x86)"), e("ProgramW6432"), e("ProgramData"), R, L, os.path.join(L, "Programs"),
+             os.path.join(e("USERPROFILE"), "AppData", "LocalLow"), os.path.join(R, menu), os.path.join(e("ProgramData"), menu),
+             os.path.join(e("USERPROFILE"), "Desktop"), os.path.join(e("PUBLIC"), "Desktop")]
+    return list({os.path.normcase(r): r for r in roots if r and os.path.isdir(r)}.values())
+
+
+def dir_size(p):
+    total = 0
+    for d, subs, names in os.walk(p):
+        subs[:] = [s for s in subs if not _is_link(os.path.join(d, s))]
+        for n in names:
+            try:
+                total += os.lstat(os.path.join(d, n)).st_size
+            except OSError:
+                pass
+    return total
+
+
+def leftovers(a, roots=None, soft=SOFT, adobe_roots=None):
+    """Что осталось от программы: папка установки, папки с её именем в Program Files, AppData, ProgramData,
+    в «Пуске», ярлыки на рабочем столе, её ключи в реестре и сама запись об установке."""
+    roots = file_roots() if roots is None else roots
+    names, pub = app_names(a)
+    keep = {os.path.normcase(r) for r in roots}
+    others = [os.path.normcase(h) for x in APPS.values() if x["id"] != a["id"] and (h := app_home(x))]
+
+    def ok(p):  # не корень, не системное и внутри нет другой установленной программы
+        n = os.path.normcase(p)
+        return n not in keep and not protected(p) and not any(o == n or o.startswith(n + os.sep) for o in others)
+
+    def ours(entry):
+        if entry.is_dir(follow_symlinks=False) and not _is_link(entry.path):
+            return norm(entry.name) in names
+        return entry.name.lower().endswith(".lnk") and norm(entry.name[:-4]) in names
+
+    found = {}
+    if (home := app_home(a)) and os.path.isdir(home) and ok(home):
+        found[os.path.normcase(home)] = home
+    for root in roots:
+        try:
+            kids = list(os.scandir(root))
+        except OSError:
+            continue
+        for e in kids:
+            if ours(e) and ok(e.path):
+                found[os.path.normcase(e.path)] = e.path
+            elif pub and norm(e.name) == pub and e.is_dir(follow_symlinks=False) and not _is_link(e.path):
+                try:
+                    found.update((os.path.normcase(c.path), c.path) for c in os.scandir(e.path) if ours(c) and ok(c.path))
+                except OSError:
+                    pass
+    if fam := adobe_family(a):  # папки только этой версии, общие Adobe\After Effects не трогаем
+        found.update((os.path.normcase(p), p) for p, f, tok in adobe_folders(adobe_roots) if f == fam and adobe_match(tok, a) and ok(p))
+    paths = sorted(found.values(), key=len)
+    paths = [p for i, p in enumerate(paths) if not any(p.lower().startswith(q.lower() + os.sep) for q in paths[:i])]  # вложенное уйдёт с родителем
+    items = [sized(p) for p in paths]
+    regs = []
+    for hive, base in soft:
+        for c in reg_children(hive, base):
+            if norm(c) in names:
+                regs.append(rf"{hive}\{base}\{c}")
+            elif pub and norm(c) == pub:
+                regs += [rf"{hive}\{base}\{c}\{cc}" for cc in reg_children(hive, rf"{base}\{c}") if norm(cc) in names]
+    if key_exists(a["id"]):
+        regs.append(a["id"])
+    return items + [{"kind": "reg", "path": r, "size": None} for r in dict.fromkeys(regs)]
+
+
+# Adobe держит настройки по версиям: Adobe\After Effects\26.0, Adobe\Adobe Photoshop 2025, Adobe Illustrator 30 Settings.
+# Как Creative Cloud Cleaner Tool: папка версии принадлежит программе, если совпал год из названия или первая цифра версии.
+ADOBE_APPS = {"photoshop", "illustrator", "indesign", "incopy", "aftereffects", "premierepro", "premiererush", "mediaencoder",
+              "audition", "animate", "dreamweaver", "bridge", "characteranimator", "lightroom", "lightroomclassic", "fresco",
+              "substance3dpainter", "substance3ddesigner", "substance3dsampler", "substance3dstager", "dimension", "xd"}
+ADOBE_NAMED = re.compile(r"(?i)(?:adobe\s+)?(.+?)\s+((?:19|20)\d\d|\d+(?:\.\d+)*)(?:\s+settings)?(?:\.lnk)?$")
+
+
+def adobe_family(a):
+    """«Adobe After Effects 2026» → aftereffects; не Adobe — пусто."""
+    if "adobe" not in a["publisher"].lower():
+        return ""
+    return norm(re.sub(r"(?i)^adobe\s+|\b(?:19|20)\d\d\b", " ", VERSION_NOISE.sub(" ", a["name"])))
+
+
+def adobe_match(token, a):
+    if re.fullmatch(r"(?:19|20)\d\d", token):
+        return token in a["name"]
+    return token.split(".")[0] == a.get("version", "").split(".")[0]  # Premiere 26.2 хранит настройки в 26.0
+
+
+def adobe_folders(roots=None):
+    """(путь, программа, версия) для всех папок и ярлыков версий Adobe."""
+    if roots is None:
+        e, menu = lambda k: os.environ.get(k, ""), r"Microsoft\Windows\Start Menu\Programs"
+        roots = [os.path.join(r, "Adobe") for r in (R, L, e("ProgramFiles"), e("ProgramFiles(x86)"), e("ProgramData"),
+                                                     os.path.join(e("USERPROFILE"), "Documents"))]
+        roots += [os.path.join(R, menu), os.path.join(e("ProgramData"), menu)]
+    for root in roots:
+        try:
+            kids = list(os.scandir(root))
+        except OSError:
+            continue
+        for k in kids:
+            if _is_link(k.path):
+                continue
+            m = ADOBE_NAMED.match(k.name)
+            family = norm(re.sub(r"(?i)^adobe\s+", "", k.name))
+            if m and norm(m[1]) in ADOBE_APPS and (k.is_dir() or k.name.lower().endswith(".lnk")):
+                yield k.path, norm(m[1]), m[2]
+            elif family in ADOBE_APPS and k.is_dir():
+                try:
+                    yield from ((c.path, family, c.name) for c in os.scandir(k.path)
+                                if c.is_dir() and not _is_link(c.path) and re.fullmatch(r"\d+(?:\.\d+)*", c.name))
+                except OSError:
+                    pass
+
+
+def sized(p):
+    return {"kind": "dir" if os.path.isdir(p) else "file", "path": p, "size": dir_size(p) if os.path.isdir(p) else os.path.getsize(p)}
+
+
+def adobe_leftovers(roots=None):
+    """Папки версий Adobe, которых на компьютере больше нет (Photoshop 2025 при установленном 2026)."""
+    have = [a for a in APPS.values() if adobe_family(a)]
+    return [sized(p) for p, fam, tok in adobe_folders(roots)
+            if not protected(p) and not any(adobe_family(a) == fam and adobe_match(tok, a) for a in have)]
+
+
+def remove_leftover(item, roots):
+    """Папки и ярлыки — в корзину, ключ реестра — сперва в .reg-копию, потом удалить."""
+    p = item["path"]
+    if item["kind"] == "reg":
+        REG_BACKUP.mkdir(parents=True, exist_ok=True)
+        run("reg", "export", p, str(REG_BACKUP / f"{time.strftime('%Y%m%d-%H%M%S')}-{norm(p)[-40:]}.reg"), "/y", "/reg:64")
+        run("reg", "delete", p, "/f", "/reg:64")
+        return not key_exists(p)
+    if protected(p):
+        return False
+    gone = not os.path.lexists(p) or recycle(p)
+    parent = os.path.dirname(p)
+    if gone and os.path.normcase(parent) not in {os.path.normcase(r) for r in roots} and not protected(parent):
+        try:
+            os.rmdir(parent)  # опустевшая папка издателя
+        except OSError:
+            pass
+    return gone
+
+
+def uninstall_cmd(cmd):
+    """MSI в списке часто записан как «изменить» (/I), а нам нужно удаление (/X)."""
+    return re.sub(r"(?i)(msiexec(?:\.exe)?\s+)/I\s*(\{)", r"\1/X\2", os.path.expandvars(cmd))
+
+
+def resolve_lnk(p):
+    if not p.lower().endswith(".lnk"):
+        return p
+    code, out = ps(f"(New-Object -ComObject WScript.Shell).CreateShortcut('{p.replace(chr(39), chr(39) * 2)}').TargetPath")
+    return out.strip() if code == 0 and out.strip() else p
+
+
+def find_app(path):
+    """Какая программа стоит за ярлыком или exe: файл лежит в её папке, а если нет — совпадает имя ярлыка."""
+    target, stem = os.path.normcase(resolve_lnk(path)), norm(Path(path).stem)
+    by_name = None
+    for a in APPS.values():
+        homes = [h for h in (app_home(a), a["icon"] and os.path.dirname(a["icon"])) if h and not protected(h)]
+        if any(target.startswith(os.path.normcase(h) + os.sep) for h in homes):
+            return a["id"]
+        if not by_name and stem in app_names(a)[0]:
+            by_name = a["id"]
+    return by_name
+
+
+def sync_menu(on):
+    """Пункт в меню Проводника для ярлыков и exe. В Windows 11 он под «Показать дополнительные параметры»."""
+    for k in MENU_KEYS:
+        if on:
+            reg_set("HKCU", k, "", tr("Удалить через Яйцечист", "Uninstall with Yaytsechist"))
+            reg_set("HKCU", k, "Icon", sys.executable if FROZEN else str(ASSETS / "icon.ico"))
+            reg_set("HKCU", k + r"\command", "", f'"{EXE}" {SCRIPT}--uninstall "%1"')
+        else:
+            for sub in (k + r"\command", k):
+                try:
+                    winreg.DeleteKey(winreg.HKEY_CURRENT_USER, sub)
+                except OSError:
+                    pass
+
+
 # ---------- состояние и окно ----------
 
 OLD_ORDER = [c[0] for c in CATEGORIES[:8]] + ["Кэш After Effects"]
@@ -870,7 +1159,7 @@ def migrate_cats(cats):
 
 
 DEFAULTS = {"applied": None, "cats": {c[0]: c[3] for c in CATEGORIES}, "ram_mask": RAM_DEFAULT,
-            "auto_on": False, "auto_pct": 90, "int_on": False, "int_min": 30, "tray_on": False, "lang": "", "ask_delete": True}
+            "auto_on": False, "auto_pct": 90, "int_on": False, "int_min": 30, "tray_on": False, "lang": "", "ask_delete": True, "menu_on": True}
 
 
 def load(fallback=None):
@@ -893,7 +1182,7 @@ def save(data):
 
 # ---------- обновление и язык ----------
 
-VERSION = "1.1.2"
+VERSION = "1.2.0"
 REPO, ASSET = "fggtf24-cyber/yaytsechist", "Yaytsechist.exe"
 TITLES = {"ru": "Яйцечист", "en": "Yaytsechist"}
 
@@ -994,7 +1283,7 @@ class Api:
                 "cats": [{"name": c[0], "note": c[4], "on": st["cats"].get(c[0], c[3])} for c in CATEGORIES],
                 "areas": [{"flag": f, "name": n, "note": t} for f, n, t in RAM_AREAS],
                 "kinds": [k[0] for k in KINDS] + ["Другое"], "ext_kinds": KIND_OF, "lang": lang_of(st), "version": VERSION,
-                "mask": st["ram_mask"], **{k: st[k] for k in ("auto_on", "auto_pct", "int_on", "int_min", "tray_on", "ask_delete")}}
+                "mask": st["ram_mask"], **{k: st[k] for k in ("auto_on", "auto_pct", "int_on", "int_min", "tray_on", "ask_delete", "menu_on")}}
 
     def sysinfo(self):
         return {"timer": query_timer(), "plan": plan_name()}
@@ -1020,6 +1309,8 @@ class Api:
             save(st)
         if key in ("auto_on", "int_on", "tray_on"):
             sync_agent(st)
+        if key == "menu_on":
+            sync_menu(value)
         if key == "lang":
             import webview
             webview.windows[0].set_title(TITLES[value])
@@ -1156,6 +1447,57 @@ class Api:
     def reboot(self):
         run("shutdown", "/r", "/t", "5")
 
+    def apps(self):
+        return [{k: a[k] for k in ("id", "name", "publisher", "size", "location")} for a in installed()]
+
+    def app_request(self):
+        """Нажали «Удалить через Яйцечист» в Проводнике: вывести окно и сказать, какую программу выделить."""
+        try:
+            path = UNINSTALL_REQ.read_text("utf-8")
+            UNINSTALL_REQ.unlink()
+        except OSError:
+            return None
+        u32 = ctypes.windll.user32
+        if h := find_window():
+            if u32.IsIconic(h):
+                u32.ShowWindow(h, 9)  # SW_RESTORE, только если свёрнуто: развёрнутое окно не трогаем
+            u32.SetForegroundWindow(h)
+        if not APPS:
+            installed()
+        return {"path": path, "id": find_app(path)}
+
+    def uninstall_start(self, app_id):
+        global PROC
+        try:
+            PROC = subprocess.Popen(uninstall_cmd(APPS[app_id]["cmd"]))
+        except (OSError, KeyError) as e:
+            return str(e)
+
+    def uninstall_state(self, app_id):
+        """Удалители вроде NSIS сразу запускают свою копию и выходят, поэтому конец удаления — это пропавшая запись в реестре."""
+        return {"running": bool(PROC and PROC.poll() is None), "gone": not key_exists(app_id)}
+
+    def leftovers(self, app_id):
+        global LEFT
+        items = leftovers(APPS[app_id])
+        LEFT = {i["path"]: i for i in items}
+        return items
+
+    def adobe_leftovers(self):
+        global LEFT
+        installed()
+        items = adobe_leftovers()
+        LEFT = {i["path"]: i for i in items}
+        return items
+
+    def leftovers_delete(self, paths):
+        roots, done, freed = file_roots(), 0, 0
+        for p in paths:
+            if p in LEFT and remove_leftover(LEFT[p], roots):  # удаляем только то, что сами нашли
+                done += 1
+                freed += LEFT[p]["size"] or 0
+        return {"done": done, "failed": len(paths) - done, "freed": freed}
+
 
 def gui(check=False):
     """check=True — открыть окно, убедиться, что интерфейс получил данные от Python, и выйти (код 0/1)."""
@@ -1195,7 +1537,8 @@ def gui(check=False):
     def started():
         if FROZEN:
             programs = Path(os.environ["APPDATA"]) / "Microsoft" / "Windows" / "Start Menu" / "Programs"
-            threading.Thread(target=make_shortcut, args=(str(programs / f"{TITLES[lang_of(load())]}.lnk"), sys.executable), daemon=True).start()
+            threading.Thread(target=lambda: (make_shortcut(str(programs / f"{TITLES[lang_of(load())]}.lnk"), sys.executable),
+                                             sync_menu(load()["menu_on"])), daemon=True).start()
         titlebar()
         if check:
             probe()
@@ -1307,6 +1650,45 @@ def selftest():
         os.chmod(os.path.join(d, "sub", "a.dll"), stat.S_IREAD)  # только чтение, как многое в Windows.old
         Path(tmp, "keep.txt").write_text("x")
         assert clean(("w", [d], 0, False, "", clean_winold)) == 90 and not os.path.exists(d) and os.path.exists(os.path.join(tmp, "keep.txt"))
+    app = {"id": r"HKCU\Software\нет-такого-ключа", "name": "Foo Bar 1.2.3 (x64)", "publisher": "Acme Inc.", "location": "", "icon": "", "cmd": ""}
+    assert app_names(app) == ({"foobar"}, "acme"), app_names(app)
+    guid_ = "{12345678-1234-1234-1234-123456789012}"
+    assert uninstall_cmd("MsiExec.exe /I" + guid_) == "MsiExec.exe /X" + guid_ and exe_of('"C:\\a b\\u.exe" /S') == "C:\\a b\\u.exe"
+    assert exe_of("C:\\a b\\unins000.exe /S") == "C:\\a b\\unins000.exe"
+    with tempfile.TemporaryDirectory() as root:
+        for d in ("Foo Bar", r"Acme\FooBar", r"Acme\Other\x", "Foo Barn", r"Games\Foo Bar"):
+            os.makedirs(os.path.join(root, d))
+        Path(root, "Foo Bar.lnk").write_text("x")
+        Path(root, "Games", "Foo Bar", "unins000.exe").write_text("x")
+        other = {**app, "id": r"HKCU\Software\нет-other", "name": "Other", "location": os.path.join(root, "Acme", "Other")}
+        shared = {**app, "id": r"HKCU\Software\нет-shared", "location": os.path.join(root, "Games"), "cmd": os.path.join(root, "Games", "Foo Bar", "unins000.exe")}
+        APPS.clear()
+        APPS.update((x["id"], x) for x in (app, other, shared))
+        found = {i["path"] for i in leftovers(app, roots=[root], soft=[])}
+        assert found == {os.path.join(root, p) for p in ("Foo Bar", r"Acme\FooBar", "Foo Bar.lnk")}, found
+        assert app_home(shared) == "" and app_home(other) == other["location"], "общую папку Games приняли за папку программы"
+        assert not any(i["path"].endswith("Games") for i in leftovers(shared, roots=[root], soft=[])), "предложено удалить общую папку"
+        assert find_app(os.path.join(root, "Acme", "Other", "x", "run.exe")) == other["id"] and find_app(r"C:\Foo Bar.exe") == app["id"]
+        # Ample Sound: папка с удалителем названа по издателю, в ней и в AppData\Ample Sound живут и другие его плагины
+        for d in (r"Ample Sound", r"Plugins\Ample Sound"):
+            os.makedirs(os.path.join(root, d))
+        Path(root, "Plugins", "Ample Sound", "unins.exe").write_text("x")
+        bass = {**app, "id": r"HKCU\Software\нет-bass", "name": "Ample Bass J", "publisher": "Ample Sound Technology Co., Ltd.",
+                "location": os.path.join(root, "Plugins", "Ample Sound"), "cmd": os.path.join(root, "Plugins", "Ample Sound", "unins.exe")}
+        APPS[bass["id"]] = bass
+        assert app_home(bass) == "" and not leftovers(bass, roots=[root], soft=[]), "предложена общая папка издателя"
+        APPS.clear()
+    with tempfile.TemporaryDirectory() as root:  # Adobe: удаляем только папки своей версии и версий, которых уже нет
+        for d in (r"After Effects\26.0", r"After Effects\25.6", r"After Effects\Logs", "Adobe Photoshop 2025", "Adobe Photoshop 2026", "Common"):
+            os.makedirs(os.path.join(root, d))
+        ae = {"id": r"HKCU\Software\нет-ae", "name": "Adobe After Effects 2026", "publisher": "Adobe Inc.", "version": "26.2.1",
+              "location": "", "icon": "", "cmd": ""}
+        ps26 = {**ae, "id": r"HKCU\Software\нет-ps", "name": "Adobe Photoshop 2026", "version": "27.8"}
+        APPS.update((x["id"], x) for x in (ae, ps26))
+        assert adobe_family(ae) == "aftereffects" and adobe_family({**ae, "publisher": "Acme"}) == ""
+        assert {i["path"] for i in adobe_leftovers([root])} == {os.path.join(root, p) for p in (r"After Effects\25.6", "Adobe Photoshop 2025")}
+        assert {i["path"] for i in leftovers(ae, roots=[], soft=[], adobe_roots=[root])} == {os.path.join(root, r"After Effects\26.0")}
+        APPS.clear()
     assert human(1536) == "2 КБ" and human(5 * 1024 ** 3) == "5.0 ГБ"
     bcd = "identifier              {current}\nuseplatformtick         Yes\ndisabledynamictick      Да\nnx  OptIn\n"
     assert parse_bcd(bcd) == {"useplatformtick": "yes", "disabledynamictick": "yes"}, parse_bcd(bcd)
@@ -1320,6 +1702,15 @@ def selftest():
 
 
 if __name__ == "__main__":
+    if "--uninstall" in sys.argv:  # из меню Проводника: запомнить путь, а дальше обычный запуск без лишних аргументов
+        i = sys.argv.index("--uninstall")
+        STATE.parent.mkdir(parents=True, exist_ok=True)
+        UNINSTALL_REQ.write_text(sys.argv[i + 1] if i + 1 < len(sys.argv) else "", "utf-8")
+        del sys.argv[i:i + 2]
+        ctypes.windll.user32.AllowSetForegroundWindow(-1)  # ASFW_ANY: окно само выйдет вперёд
+        k = ctypes.WinDLL("kernel32", use_last_error=True)
+        if k.OpenMutexW(0x100000, False, "GameBoostWindow") or ctypes.get_last_error() == 5:
+            sys.exit()  # окно уже открыто и через секунду само подхватит путь — без второго запроса прав
     if "--selftest" in sys.argv:
         selftest()
     elif "--scan" in sys.argv:
