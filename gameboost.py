@@ -473,9 +473,10 @@ def cache_patterns(roots):
 
 
 def ae_cache():
-    """Где кэш у этого пользователя: настройки всех версий AE, реестр Adobe и стандартная папка. None — AE не установлен."""
+    """Где медиакэш Adobe у этого пользователя (он общий у Premiere, After Effects, Media Encoder, Audition):
+    настройки всех версий AE, реестр Adobe и стандартная папка Adobe\\Common. None — программ Adobe нет."""
     prefs = glob.glob(glob.escape(R) + r"\Adobe\After Effects\*\*Prefs.txt")
-    if not prefs:
+    if not prefs and not os.path.isdir(R + r"\Adobe\Common"):
         return None
     roots = [R + r"\Adobe\Common"]
     for f in prefs:
@@ -494,7 +495,7 @@ def ae_cache():
 
 
 if ae := ae_cache():
-    CATEGORIES.append(("Кэш After Effects", ae, 0, False, "закройте Adobe"))
+    CATEGORIES.append(("Медиакэш Adobe", ae, 0, True, "закройте Premiere и After Effects"))
 
 SYSTEM_DRIVE = os.environ.get("SystemDrive", "C:") + "\\"
 
@@ -1315,7 +1316,7 @@ def save(data):
 
 # ---------- обновление и язык ----------
 
-VERSION = "1.3.1"
+VERSION = "1.3.2"
 REPO, ASSET = "fggtf24-cyber/yaytsechist", "Yaytsechist.exe"
 TITLES = {"ru": "Яйцечист", "en": "Yaytsechist"}
 
