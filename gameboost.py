@@ -968,6 +968,17 @@ def hook(a):
         reg_set(hive, path, "WindowsInstaller", 0)
 
 
+def passthrough(key, extra):
+    """Установщики при обновлении сами тихо запускают старый удалитель из UninstallString (NSIS: /S --updated _?=папка).
+    Это не человек нажал «Удалить» — окно не открываем, отдаём настоящей команде те же аргументы и ждём её."""
+    hive, _, path = key.partition("\\")
+    real = reg_get(hive, path, HOOK_VALUE)
+    if not real:
+        return 1
+    # " ".join, а не list2cmdline: NSIS не понимает кавычки в _?=, а путь с пробелами в argv пришёл кусками
+    return subprocess.call(f'{uninstall_cmd(real)} {" ".join(extra)}')
+
+
 def unhook(a):
     """Вернуть как было: настоящую строку на место, нашу копию убрать."""
     hive, _, path = a["id"].partition("\\")
@@ -1316,7 +1327,7 @@ def save(data):
 
 # ---------- обновление и язык ----------
 
-VERSION = "1.3.2"
+VERSION = "1.3.3"
 REPO, ASSET = "fggtf24-cyber/yaytsechist", "Yaytsechist.exe"
 TITLES = {"ru": "Яйцечист", "en": "Yaytsechist"}
 
@@ -1683,7 +1694,8 @@ def gui(check=False):
         os._exit(1)
 
     def started():
-        if FROZEN:
+        # из Temp нас запускает чужой установщик (копия exe как old-uninstaller.exe): этот путь в реестр и ярлык писать нельзя
+        if FROZEN and not os.path.normcase(os.path.realpath(sys.executable)).startswith(os.path.normcase(os.path.realpath(tempfile.gettempdir())) + os.sep):
             programs = Path(os.environ["APPDATA"]) / "Microsoft" / "Windows" / "Start Menu" / "Programs"
             threading.Thread(target=lambda: (make_shortcut(str(programs / f"{TITLES[lang_of(load())]}.lnk"), sys.executable),
                                              sync_menu(load()["menu_on"]), sync_hooks(load()["hook_on"])), daemon=True).start()
@@ -1843,6 +1855,9 @@ def selftest():
         assert reg_get("HKCU", test_key[5:], "WindowsInstaller") == 0 and reg_get("HKCU", test_key[5:], MSI_VALUE) == 1
         unhook(t_app)
         assert reg_get("HKCU", test_key[5:], "WindowsInstaller") == 1 and reg_get("HKCU", test_key[5:], MSI_VALUE) is None
+        if not FROZEN:  # «удалитель» — тот же python, проверяет, что аргументы установщика дошли как есть
+            reg_set("HKCU", test_key[5:], HOOK_VALUE, f'"{EXE}" -c "import sys; sys.exit(7 if sys.argv[1:] == [\'/S\', \'_?=D:/a\', \'b\'] else 1)"')
+            assert passthrough(test_key, ["/S", "_?=D:/a", "b"]) == 7, "аргументы установщика не дошли до настоящего удалителя"
     finally:
         winreg.DeleteKey(winreg.HKEY_CURRENT_USER, test_key[5:])
     with tempfile.TemporaryDirectory() as root:  # последний запуск: путь из UserAssist, ярлык, имя exe из Prefetch
@@ -1886,6 +1901,8 @@ if __name__ == "__main__":
         i = sys.argv.index(flag)
         STATE.parent.mkdir(parents=True, exist_ok=True)
         arg = sys.argv[i + 1] if i + 1 < len(sys.argv) else ""
+        if flag == "--uninstall-key" and sys.argv[i + 2:]:  # мы дописываем только ключ; всё, что после, — от установщика
+            sys.exit(passthrough(arg, sys.argv[i + 2:]))
         UNINSTALL_REQ.write_text(("key:" if flag == "--uninstall-key" else "") + arg, "utf-8")
         del sys.argv[i:i + 2]
         ctypes.windll.user32.AllowSetForegroundWindow(-1)  # ASFW_ANY: окно само выйдет вперёд
